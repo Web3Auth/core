@@ -27,8 +27,8 @@
     { "path": "./packages/keyring-controller" },
     { "path": "./packages/message-manager" },
     { "path": "./packages/multichain" },
-    { "path": "./packages/multichain-transactions-controller" },
     { "path": "./packages/multichain-network-controller" },
+    { "path": "./packages/multichain-transactions-controller" },
     { "path": "./packages/name-controller" },
     { "path": "./packages/network-controller" },
     { "path": "./packages/notification-services-controller" },
@@ -43,6 +43,7 @@
     { "path": "./packages/remote-feature-flag-controller" },
     { "path": "./packages/selected-network-controller" },
     { "path": "./packages/signature-controller" },
+    { "path": "./packages/test-controller" },
     { "path": "./packages/token-search-discovery-controller" },
     { "path": "./packages/transaction-controller" },
     { "path": "./packages/user-operation-controller" }
