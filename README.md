@@ -55,6 +55,7 @@ Each package in this repository has its own README where you can find installati
 - [`@metamask/queued-request-controller`](packages/queued-request-controller)
 - [`@metamask/rate-limit-controller`](packages/rate-limit-controller)
 - [`@metamask/remote-feature-flag-controller`](packages/remote-feature-flag-controller)
+- [`@metamask/seedless-onboarding-controller`](packages/seedless-onboarding-controller)
 - [`@metamask/selected-network-controller`](packages/selected-network-controller)
 - [`@metamask/signature-controller`](packages/signature-controller)
 - [`@metamask/token-search-discovery-controller`](packages/token-search-discovery-controller)
@@ -104,6 +105,7 @@ linkStyle default opacity:0.5
   queued_request_controller(["@metamask/queued-request-controller"]);
   rate_limit_controller(["@metamask/rate-limit-controller"]);
   remote_feature_flag_controller(["@metamask/remote-feature-flag-controller"]);
+  seedless_onboarding_controller(["@metamask/seedless-onboarding-controller"]);
   selected_network_controller(["@metamask/selected-network-controller"]);
   signature_controller(["@metamask/signature-controller"]);
   token_search_discovery_controller(["@metamask/token-search-discovery-controller"]);
@@ -129,15 +131,15 @@ linkStyle default opacity:0.5
   bridge_controller --> base_controller;
   bridge_controller --> controller_utils;
   bridge_controller --> polling_controller;
-  bridge_controller --> transaction_controller;
   bridge_controller --> accounts_controller;
   bridge_controller --> eth_json_rpc_provider;
   bridge_controller --> network_controller;
+  bridge_controller --> transaction_controller;
   bridge_status_controller --> base_controller;
+  bridge_status_controller --> bridge_controller;
   bridge_status_controller --> controller_utils;
   bridge_status_controller --> polling_controller;
   bridge_status_controller --> accounts_controller;
-  bridge_status_controller --> bridge_controller;
   bridge_status_controller --> network_controller;
   bridge_status_controller --> transaction_controller;
   composable_controller --> base_controller;
@@ -220,12 +222,12 @@ linkStyle default opacity:0.5
   token_search_discovery_controller --> base_controller;
   transaction_controller --> base_controller;
   transaction_controller --> controller_utils;
-  transaction_controller --> remote_feature_flag_controller;
   transaction_controller --> accounts_controller;
   transaction_controller --> approval_controller;
   transaction_controller --> eth_json_rpc_provider;
   transaction_controller --> gas_fee_controller;
   transaction_controller --> network_controller;
+  transaction_controller --> remote_feature_flag_controller;
   user_operation_controller --> base_controller;
   user_operation_controller --> controller_utils;
   user_operation_controller --> polling_controller;

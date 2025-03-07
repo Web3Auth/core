@@ -61,6 +61,9 @@
 ## Wallet UX Team
 /packages/announcement-controller      @MetaMask/wallet-ux
 
+## Web3Auth Team
+/packages/seedless-onboarding-controller @MetaMask/web3auth-engineers
+
 ## Joint team ownership
 /packages/eth-json-rpc-provider        @MetaMask/wallet-api-platform-engineers @MetaMask/wallet-framework-engineers
 /packages/json-rpc-engine              @MetaMask/wallet-api-platform-engineers @MetaMask/wallet-framework-engineers
@@ -71,6 +74,7 @@
 /packages/permission-log-controller    @MetaMask/wallet-api-platform-engineers @MetaMask/wallet-framework-engineers
 /packages/profile-sync-controller      @MetaMask/identity
 /packages/remote-feature-flag-controller @MetaMask/extension-platform @MetaMask/mobile-platform
+/packages/seedless-onboarding-controller @MetaMask/web3auth-engineers @MetaMask/wallet-framework-engineers
 
 ## Package Release related
 /packages/accounts-controller/package.json        @MetaMask/accounts-engineers @MetaMask/wallet-framework-engineers
@@ -127,3 +131,5 @@
 /packages/remote-feature-flag-controller/CHANGELOG.md @MetaMask/extension-platform @MetaMask/mobile-platform @MetaMask/wallet-framework-engineers
 /packages/bridge-status-controller/package.json         @MetaMask/swaps-engineers @MetaMask/wallet-framework-engineers
 /packages/bridge-status-controller/CHANGELOG.md         @MetaMask/swaps-engineers @MetaMask/wallet-framework-engineers
+/packages/seedless-onboarding-controller/package.json @MetaMask/web3auth-engineers @MetaMask/wallet-framework-engineers
+/packages/seedless-onboarding-controller/CHANGELOG.md @MetaMask/web3auth-engineers @MetaMask/wallet-framework-engineers
