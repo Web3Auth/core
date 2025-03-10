@@ -67,9 +67,9 @@ export default class SeedlessOnboardingController extends BaseController<
     // handle OPRF and generate EK -> signing key pair
     const ek = this.deriveEk({ idToken, verifier, verifierId, password });
     // encrypt SRP with EK and store on metadata service
-    const encryptedSRP = this.encryptSRP({ srp, ek });
+    const encryptedSRP = this.#encryptSRP({ srp, ek });
     // store encryptedSRP on metadata service
-    await this.storeEncryptedSRP({
+    await this.#storeEncryptedSRP({
       idToken,
       verifier,
       verifierId,
@@ -91,7 +91,7 @@ export default class SeedlessOnboardingController extends BaseController<
     // verify idToken
     await this.verifyIdToken({ idToken, verifier });
     // fetch encrypted SRP from metadata service using EK
-    const encryptedSRP = await this.fetchEncryptedSRP({
+    const encryptedSRP = await this.#fetchEncryptedSRP({
       idToken,
       verifier,
       verifierId,
@@ -99,7 +99,7 @@ export default class SeedlessOnboardingController extends BaseController<
     // handle OPRF and restore EK
     const ek = this.deriveEk({ idToken, verifier, verifierId, password });
     // decrypt SRP
-    const srp = this.decryptSRP({ encryptedSRP, ek });
+    const srp = this.#decryptSRP({ encryptedSRP, ek });
     return srp;
   }
 
@@ -115,19 +115,19 @@ export default class SeedlessOnboardingController extends BaseController<
     return '';
   }
 
-  private encryptSRP(_params: { srp: string; ek: string }): string {
+  #encryptSRP(_params: { srp: string; ek: string }): string {
     // encrypt SRP with EK
     // return encrypted SRP
     return '';
   }
 
-  private decryptSRP(_params: { encryptedSRP: string; ek: string }): string {
+  #decryptSRP(_params: { encryptedSRP: string; ek: string }): string {
     // decrypt SRP with EK
     // return SRP
     return '';
   }
 
-  private async storeEncryptedSRP(_params: {
+  async #storeEncryptedSRP(_params: {
     idToken: string;
     verifier: string;
     verifierId: string;
@@ -136,7 +136,7 @@ export default class SeedlessOnboardingController extends BaseController<
     // store encrypted SRP on metadata service
   }
 
-  private async fetchEncryptedSRP(_params: {
+  async #fetchEncryptedSRP(_params: {
     idToken: string;
     verifier: string;
     verifierId: string;
