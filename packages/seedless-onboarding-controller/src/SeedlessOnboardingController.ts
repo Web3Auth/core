@@ -1,8 +1,13 @@
 import type {
+  ControllerGetStateAction,
   RestrictedMessenger,
   StateMetadata,
 } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
+import type {
+  KeyringControllerState,
+  KeyringControllerStateChangeEvent,
+} from '@metamask/keyring-controller';
 
 const controllerName = 'BaseSeedlessOnboardingController';
 
@@ -10,20 +15,29 @@ const controllerName = 'BaseSeedlessOnboardingController';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type SeedlessOnboardingControllerState = {};
 
-export const defaultState: SeedlessOnboardingControllerState = {};
+// Actions
+export type SeedlessOnboardingControllerGetStateActions =
+  ControllerGetStateAction<
+    typeof controllerName,
+    SeedlessOnboardingControllerState
+  >;
 
+export type AllowedEvents = KeyringControllerStateChangeEvent;
+export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
+
+export const defaultState: SeedlessOnboardingControllerState = {};
 const metadata: StateMetadata<SeedlessOnboardingControllerState> = {};
 
 // Messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
   typeof controllerName,
-  never,
-  never,
-  never,
-  never
+  AllowedActions,
+  AllowedEvents,
+  AllowedActions['type'],
+  AllowedEvents['type']
 >;
 
-export default class SeedlessOnboardingController extends BaseController<
+export class SeedlessOnboardingController extends BaseController<
   typeof controllerName,
   SeedlessOnboardingControllerState,
   SeedlessOnboardingControllerMessenger
@@ -39,14 +53,8 @@ export default class SeedlessOnboardingController extends BaseController<
       name: controllerName,
       state: { ...defaultState },
     });
-  }
 
-  async verifyIdToken(_params: {
-    idToken: string;
-    verifier: string;
-  }): Promise<void> {
-    // verify idToken
-    // return user info
+    this.#subscribeToMessageEvents();
   }
 
   async generateAndBackupSRP({
@@ -62,8 +70,6 @@ export default class SeedlessOnboardingController extends BaseController<
     verifierId: string;
     password: string;
   }): Promise<void> {
-    // verify idToken
-    await this.verifyIdToken({ idToken, verifier });
     // handle OPRF and generate EK -> signing key pair
     const ek = this.deriveEk({ idToken, verifier, verifierId, password });
     // encrypt SRP with EK and store on metadata service
@@ -88,8 +94,6 @@ export default class SeedlessOnboardingController extends BaseController<
     verifierId: string;
     password: string;
   }): Promise<string> {
-    // verify idToken
-    await this.verifyIdToken({ idToken, verifier });
     // fetch encrypted SRP from metadata service using EK
     const encryptedSRP = await this.#fetchEncryptedSRP({
       idToken,
@@ -143,5 +147,23 @@ export default class SeedlessOnboardingController extends BaseController<
   }): Promise<string> {
     // fetch encrypted SRP from metadata service
     return '';
+  }
+
+  #handleKeyringStateChange(_keyringState: KeyringControllerState) {
+    // handle keyring state change
+    // Actions to perform when keyring state changes
+    // 1. when the existing keyring is removed,
+    // 2. when the new keyring is added
+    // 3. when more than one keyring is added
+  }
+
+  /**
+   * Constructor helper for subscribing to message events.
+   */
+  #subscribeToMessageEvents() {
+    this.messagingSystem.subscribe(
+      'KeyringController:stateChange',
+      (keyringState) => this.#handleKeyringStateChange(keyringState),
+    );
   }
 }

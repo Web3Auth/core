@@ -4030,6 +4030,7 @@ __metadata:
   resolution: "@metamask/seedless-onboarding-controller@workspace:packages/seedless-onboarding-controller"
   dependencies:
     "@metamask/auto-changelog": "npm:^3.4.4"
+    "@metamask/keyring-controller": "npm:^21.0.0"
     "@types/jest": "npm:^27.4.1"
     deepmerge: "npm:^4.2.2"
     jest: "npm:^27.5.1"
@@ -4037,6 +4038,8 @@ __metadata:
     typedoc: "npm:^0.24.8"
     typedoc-plugin-missing-exports: "npm:^2.0.0"
     typescript: "npm:~5.2.2"
+  peerDependencies:
+    "@metamask/keyring-controller": ^21.0.0
   languageName: unknown
   linkType: soft
 
