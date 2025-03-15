@@ -9,6 +9,12 @@ import type {
   KeyringControllerStateChangeEvent,
 } from '@metamask/keyring-controller';
 
+import type {
+  CreateSeedlessBackupParams,
+  OAuthParams,
+  RestoreSeedlessBackupParams,
+} from './types';
+
 const controllerName = 'BaseSeedlessOnboardingController';
 
 // State
@@ -62,18 +68,12 @@ export class SeedlessOnboardingController extends BaseController<
     verifier,
     verifierId,
     password,
-    srp,
-  }: {
-    srp: string;
-    idToken: string;
-    verifier: string;
-    verifierId: string;
-    password: string;
-  }): Promise<void> {
+    seedPhrase,
+  }: CreateSeedlessBackupParams): Promise<void> {
     // handle OPRF and generate EK -> signing key pair
     const ek = this.deriveEk({ idToken, verifier, verifierId, password });
     // encrypt SRP with EK and store on metadata service
-    const encryptedSRP = this.#encryptSRP({ srp, ek });
+    const encryptedSRP = this.#encryptSRP({ seedPhrase, ek });
     // store encryptedSRP on metadata service
     await this.#storeEncryptedSRP({
       idToken,
@@ -88,12 +88,7 @@ export class SeedlessOnboardingController extends BaseController<
     password,
     verifier,
     verifierId,
-  }: {
-    idToken: string;
-    verifier: string;
-    verifierId: string;
-    password: string;
-  }): Promise<string> {
+  }: RestoreSeedlessBackupParams): Promise<string> {
     // fetch encrypted SRP from metadata service using EK
     const encryptedSRP = await this.#fetchEncryptedSRP({
       idToken,
@@ -119,7 +114,7 @@ export class SeedlessOnboardingController extends BaseController<
     return '';
   }
 
-  #encryptSRP(_params: { srp: string; ek: string }): string {
+  #encryptSRP(_params: { seedPhrase: string; ek: string }): string {
     // encrypt SRP with EK
     // return encrypted SRP
     return '';
@@ -140,11 +135,7 @@ export class SeedlessOnboardingController extends BaseController<
     // store encrypted SRP on metadata service
   }
 
-  async #fetchEncryptedSRP(_params: {
-    idToken: string;
-    verifier: string;
-    verifierId: string;
-  }): Promise<string> {
+  async #fetchEncryptedSRP(_params: OAuthParams): Promise<string> {
     // fetch encrypted SRP from metadata service
     return '';
   }
