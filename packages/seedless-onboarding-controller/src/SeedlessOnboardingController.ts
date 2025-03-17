@@ -15,7 +15,7 @@ import type {
   RestoreSeedlessBackupParams,
 } from './types';
 
-const controllerName = 'BaseSeedlessOnboardingController';
+const controllerName = 'SeedlessOnboardingController';
 
 // State
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
