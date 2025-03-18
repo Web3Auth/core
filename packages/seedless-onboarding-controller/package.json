@@ -48,9 +48,9 @@
   },
   "dependencies": {
     "@metamask/base-controller": "^8.0.0",
-    "@metamask/browser-passworder": "^6.0.0",
+    "@metamask/browser-passworder": "^4.3.0",
     "@metamask/keyring-controller": "^21.0.0",
-    "@metamask/utils": "^11.3.0"
+    "@metamask/utils": "^11.2.0"
   },
   "devDependencies": {
     "@metamask/auto-changelog": "^3.4.4",
