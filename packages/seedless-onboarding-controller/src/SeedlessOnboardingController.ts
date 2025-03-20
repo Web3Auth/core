@@ -42,7 +42,8 @@ export type AllowedEvents = KeyringControllerStateChangeEvent;
 export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
 
 export const defaultState: SeedlessOnboardingControllerState = {};
-const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> = {};
+const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
+  {};
 
 // Messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<

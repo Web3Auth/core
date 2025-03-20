@@ -28,6 +28,7 @@ export default class TestEncryptor {
     }
   }
 
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   async exportKey(cryptoKey: CryptoKey | EncryptionKey): Promise<string> {
     const key = 'key' in cryptoKey ? cryptoKey.key : cryptoKey;
     const exportedKey = await webcrypto.subtle.exportKey('jwk', key);
