@@ -28,6 +28,13 @@ export default class TestEncryptor {
     }
   }
 
+  async exportKey(cryptoKey: CryptoKey | EncryptionKey): Promise<string> {
+    const key = 'key' in cryptoKey ? cryptoKey.key : cryptoKey;
+    const exportedKey = await webcrypto.subtle.exportKey('jwk', key);
+
+    return JSON.stringify(exportedKey);
+  }
+
   async keyFromPassword(
     password: string,
     salt: string = this.DEFAULT_SALT,

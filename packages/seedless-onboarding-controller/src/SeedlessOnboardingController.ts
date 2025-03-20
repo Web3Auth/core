@@ -4,27 +4,25 @@ import type {
   StateMetadata,
 } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
-import type {
-  EncryptionKey,
-  EncryptionResult,
-  KeyDerivationOptions,
-} from '@metamask/browser-passworder';
 import {
   encryptWithKey,
   decryptWithKey,
   keyFromPassword,
   generateSalt,
+  importKey,
+  exportKey,
 } from '@metamask/browser-passworder';
 import type {
   KeyringControllerState,
   KeyringControllerStateChangeEvent,
 } from '@metamask/keyring-controller';
 
+import { ToprfAuthClient } from './ToprfClient';
 import type {
+  AuthenticateUserParams,
   CreateSeedlessBackupParams,
-  OAuthParams,
-  OAuthVerifier,
-  RestoreSeedlessBackupParams,
+  Encryptor,
+  NodeAuthTokens,
 } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
@@ -44,7 +42,7 @@ export type AllowedEvents = KeyringControllerStateChangeEvent;
 export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
 
 export const defaultState: SeedlessOnboardingControllerState = {};
-const metadata: StateMetadata<SeedlessOnboardingControllerState> = {};
+const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> = {};
 
 // Messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
@@ -54,57 +52,6 @@ export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
   AllowedActions['type'],
   AllowedEvents['type']
 >;
-
-export type Encryptor = {
-  /**
-   * @description Remove this method once the TOPRF lib is ready.
-   * Encryption key should be generated using the TOPRF lib.
-   * Generates a key from a password.
-   *
-   * @param password - The password to use for key generation.
-   * @param salt - The salt to use for key generation.
-   * @param exportable - Whether the key should be exportable.
-   * @param opts - The options for key generation.
-   * @returns A promise that resolves to the key.
-   */
-  keyFromPassword: (
-    password: string,
-    salt?: string,
-    exportable?: boolean,
-    opts?: KeyDerivationOptions,
-  ) => Promise<CryptoKey | EncryptionKey>;
-
-  /**
-   * Encrypts a data string using a key.
-   *
-   * @param key - The key to use for encryption.
-   * @param data - The data to encrypt.
-   * @returns A promise that resolves to the encrypted data.
-   */
-  encryptWithKey: (
-    key: CryptoKey | EncryptionKey,
-    data: string,
-  ) => Promise<EncryptionResult>;
-
-  /**
-   * Decrypts an encrypted data using a key.
-   *
-   * @param key - The key to use for decryption.
-   * @param encryptedData - The encrypted data to decrypt.
-   * @returns A promise that resolves to the decrypted data.
-   */
-  decryptWithKey: (
-    key: CryptoKey | EncryptionKey,
-    encryptedData: EncryptionResult,
-  ) => Promise<string>;
-
-  /**
-   * Generates a random salt.
-   *
-   * @returns the random salt string.
-   */
-  generateSalt?: () => string;
-};
 
 export type SeedlessOnboardingControllerOptions = {
   messenger: SeedlessOnboardingControllerMessenger;
@@ -129,159 +76,92 @@ export class SeedlessOnboardingController extends BaseController<
     encryptWithKey,
     decryptWithKey,
     generateSalt,
+    importKey,
+    exportKey,
   };
+
+  readonly #toprfAuthClient: ToprfAuthClient;
 
   constructor({ messenger, encryptor }: SeedlessOnboardingControllerOptions) {
     super({
       messenger,
-      metadata,
+      metadata: seedlessOnboardingMetadata,
       name: controllerName,
       state: { ...defaultState },
     });
     if (encryptor) {
       this.#encryptor = encryptor;
     }
+    this.#toprfAuthClient = new ToprfAuthClient(this.#encryptor);
     this.#subscribeToMessageEvents();
+  }
+
+  /**
+   * @description Authenticate OAuth user using the seedless onboarding flow
+   * and determine if the user is already registered or not.
+   * @param params - The parameters for authenticate OAuth user.
+   * @param params.idToken - The ID token from Social login
+   * @param params.verifier - OAuth verifier
+   * @param params.verifierId - user email or id from Social login
+   * @returns A promise that resolves to the authentication result.
+   */
+  async authenticateOAuthUser(params: AuthenticateUserParams) {
+    const verificationResult = await this.#toprfAuthClient.authenticate(params);
+    return verificationResult;
   }
 
   /**
    * @description Backup seed phrase using the seedless onboarding flow.
    * @param params - The parameters for backup seed phrase.
-   * @param params.idToken - The ID token from Social login
-   * @param params.verifier - OAuth verifier
-   * @param params.verifierId - user email or id from Social login
    * @param params.password - The password used to create new wallet and seedphrase
+   * @param params.nodeAuthTokens - The node auth tokens reterieved from the OAuth Authentication
    * @param params.seedPhrase - The seed phrase to backup
-   * @returns A promise that resolves to the encrypted seed phrase.
+   * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
-  async backupSeedPhrase({
-    idToken,
-    verifier,
-    verifierId,
+  async createSeedPhraseBackup({
+    nodeAuthTokens,
     password,
     seedPhrase,
-  }: CreateSeedlessBackupParams): Promise<string> {
-    // handle OPRF and generate EK -> signing key pair
-    const ek = await this.createEncryptionKey({
-      idToken,
-      verifier,
-      verifierId,
+  }: CreateSeedlessBackupParams): Promise<{
+    encryptedSeedPhrase: string;
+    encryptionKey: string;
+  }> {
+    const { encKey } = await this.#toprfAuthClient.createEncKey({
+      nodeAuthTokens,
       password,
     });
-    // encrypt SRP with EK and store on metadata service
-    const encryptedSRP = await this.#encryptSeedPhrase(ek, seedPhrase);
-    // store encryptedSRP on metadata service
-    await this.storeEncryptedSRP({
-      idToken,
-      verifier,
-      verifierId,
-      encryptedSRP,
+
+    const storeResult = await this.#toprfAuthClient.storeSecretData({
+      nodeAuthTokens,
+      encKey,
+      secretData: seedPhrase,
     });
 
-    return encryptedSRP;
+    return {
+      encryptedSeedPhrase: storeResult.encryptedSecretData,
+      encryptionKey: storeResult.encKey,
+    };
   }
 
   /**
-   * @description Restore seed phrase using the seedless onboarding flow.
-   * @param params - The parameters for restore seed phrase.
-   * @param params.idToken - The ID token from Social login
-   * @param params.password - The password used to create new wallet and seedphrase
-   * @param params.verifier - OAuth verifier
-   * @param params.verifierId - user email or id from Social login
-   * @returns A promise that resolves to the seed phrase.
+   * @description Fetch seed phrase metadata from the metadata store.
+   * @param nodeAuthTokens - The node auth tokens reterieved from the OAuth Authentication
+   * @param password - The password used to create new wallet and seedphrase
+   * @returns A promise that resolves to the seed phrase metadata.
    */
-  async restoreSRP({
-    idToken,
-    password,
-    verifier,
-    verifierId,
-  }: RestoreSeedlessBackupParams): Promise<string> {
-    // fetch encrypted SRP from metadata service using EK
-    const encryptedSRP = await this.fetchEncryptedSRP({
-      idToken,
-      verifier,
-      verifierId,
-    });
-    // handle OPRF and restore EK
-    const ek = await this.createEncryptionKey({
-      idToken,
-      verifier,
-      verifierId,
+  async fetchAndRestoreSeedPhraseMetadata(
+    nodeAuthTokens: NodeAuthTokens,
+    password: string,
+  ) {
+    const { encKey, secretData } = await this.#toprfAuthClient.fetchSecretData({
+      nodeAuthTokens,
       password,
     });
-    // decrypt SRP
-    const srp = await this.#decryptSeedPhrase(ek, encryptedSRP);
-    return srp;
-  }
 
-  /**
-   * Creates an encryption key with TOPRF and given parameters.
-   *
-   * @param _params - The parameters for creating the encryption key.
-   * @param _params.idToken - The ID token from Social login
-   * @param _params.verifier - OAuth verifier
-   * @param _params.verifierId - user email or id from Social login
-   * @param _params.password - The password used to create new wallet and seedphrase
-   * @returns A promise that resolves to the stringified encryption key.
-   */
-  async createEncryptionKey({
-    password,
-  }: {
-    idToken: string;
-    verifier: OAuthVerifier;
-    verifierId: string;
-    password: string;
-  }): Promise<CryptoKey | EncryptionKey> {
-    // TODO: this is MOCK implementation
-    // replace with actual implementation once the backend is ready
-    const key = await this.#encryptor.keyFromPassword(password);
-    return key;
-  }
-
-  async storeEncryptedSRP(_params: {
-    idToken: string;
-    verifier: string;
-    verifierId: string;
-    encryptedSRP: string;
-  }) {
-    // store encrypted SRP on metadata service
-  }
-
-  async fetchEncryptedSRP(_params: OAuthParams): Promise<string> {
-    // fetch encrypted SRP from metadata service
-    return '';
-  }
-
-  async #encryptSeedPhrase(
-    encryptionKey: CryptoKey | EncryptionKey,
-    seedPhrase: string,
-  ): Promise<string> {
-    const encryptedResult = await this.#encryptor.encryptWithKey(
-      encryptionKey,
-      seedPhrase,
-    );
-
-    return JSON.stringify(encryptedResult);
-  }
-
-  async #decryptSeedPhrase(
-    decryptionKey: CryptoKey | EncryptionKey,
-    encryptedSRP: string,
-  ): Promise<string> {
-    let encryptedResult: EncryptionResult;
-    try {
-      encryptedResult = JSON.parse(encryptedSRP) as EncryptionResult;
-    } catch (error: unknown) {
-      console.error(error);
-      throw new Error('Fail to encrypt. Invalid data');
-    }
-
-    const decryptedResult = await this.#encryptor.decryptWithKey(
-      decryptionKey,
-      encryptedResult,
-    );
-
-    return decryptedResult as string;
+    return {
+      encryptedSeedPhrase: secretData,
+      encryptionKey: encKey,
+    };
   }
 
   #handleKeyringStateChange(_keyringState: KeyringControllerState) {
