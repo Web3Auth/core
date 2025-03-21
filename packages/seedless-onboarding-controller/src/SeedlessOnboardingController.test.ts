@@ -68,7 +68,7 @@ describe('SeedlessOnboardingController', () => {
 
       expect(authResult).toBeDefined();
       expect(authResult.nodeAuthTokens).toBeDefined();
-      expect(authResult.isExistingUser).toBe(false);
+      expect(authResult.hasValidEncKey).toBe(false);
     });
 
     it('should be able to authenticate an existing user', async () => {
@@ -82,7 +82,7 @@ describe('SeedlessOnboardingController', () => {
 
       expect(authResult).toBeDefined();
       expect(authResult.nodeAuthTokens).toBeDefined();
-      expect(authResult.isExistingUser).toBe(true);
+      expect(authResult.hasValidEncKey).toBe(true);
     });
   });
 
@@ -97,7 +97,7 @@ describe('SeedlessOnboardingController', () => {
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to create a seed phrase backup', async () => {
-      const authResult = await controller.authenticateOAuthUser({
+      await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
         verifier: 'google',
         verifierID: 'test-user',
@@ -106,7 +106,6 @@ describe('SeedlessOnboardingController', () => {
       });
 
       const seedPhraseBackup = await controller.createSeedPhraseBackup({
-        nodeAuthTokens: authResult.nodeAuthTokens,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
@@ -134,7 +133,7 @@ describe('SeedlessOnboardingController', () => {
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to restore and login with a seed phrase from metadata', async () => {
-      const authResult = await controller.authenticateOAuthUser({
+      await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
         verifier: 'google',
         verifierID: 'test-user',
@@ -143,23 +142,19 @@ describe('SeedlessOnboardingController', () => {
       });
 
       await controller.createSeedPhraseBackup({
-        nodeAuthTokens: authResult.nodeAuthTokens,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
 
       const seedPhraseMetadata =
-        await controller.fetchAndRestoreSeedPhraseMetadata(
-          authResult.nodeAuthTokens,
-          MOCK_PASSWORD,
-        );
+        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadata).toBeDefined();
       expect(seedPhraseMetadata.encryptedSeedPhrase).toBeDefined();
     });
 
     it('should be able to create a seed phrase metadata if it does not exist during login', async () => {
-      const authResult = await controller.authenticateOAuthUser({
+      await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
         verifier: 'apple',
         verifierID: 'test-user-2',
@@ -168,10 +163,7 @@ describe('SeedlessOnboardingController', () => {
       });
 
       let seedPhraseMetadataFromMetadataStore =
-        await controller.fetchAndRestoreSeedPhraseMetadata(
-          authResult.nodeAuthTokens,
-          MOCK_PASSWORD,
-        );
+        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(
@@ -179,16 +171,12 @@ describe('SeedlessOnboardingController', () => {
       ).toBeNull();
 
       await controller.createSeedPhraseBackup({
-        nodeAuthTokens: authResult.nodeAuthTokens,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
 
       seedPhraseMetadataFromMetadataStore =
-        await controller.fetchAndRestoreSeedPhraseMetadata(
-          authResult.nodeAuthTokens,
-          MOCK_PASSWORD,
-        );
+        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(

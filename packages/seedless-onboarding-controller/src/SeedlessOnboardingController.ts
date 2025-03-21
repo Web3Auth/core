@@ -28,8 +28,24 @@ import type {
 const controllerName = 'SeedlessOnboardingController';
 
 // State
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export type SeedlessOnboardingControllerState = {};
+export type SeedlessOnboardingControllerState = {
+  /**
+   * The node auth tokens from OAuth User authentication after the Social login.
+   *
+   * This values are used to authenticate users when they go through the Seedless Onboarding flow.
+   */
+  nodeAuthTokens?: NodeAuthTokens;
+  /**
+   * Indicates whether the user has already fully/partially completed the Seedless Onboarding flow.
+   *
+   * An encryption key is generated from user entered password using Threshold OPRF and the seed phrase is encrypted with the key.
+   * During the Seedless Onboarding Authentication step, TOPRF services check whether user has already generated the encryption key.
+   *
+   * If this value is `true`, we can assume that user already has completed the `SeedPhrase` generation step, and user will have to
+   * fetch the `SeedPhrase` with correct password. Otherwise, users will be asked to set up seedphrase and password, first.
+   */
+  hasValidEncryptionKey?: boolean;
+};
 
 // Actions
 export type SeedlessOnboardingControllerGetStateActions =
@@ -43,7 +59,16 @@ export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
 
 export const defaultState: SeedlessOnboardingControllerState = {};
 const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
-  {};
+  {
+    nodeAuthTokens: {
+      persist: true,
+      anonymous: false,
+    },
+    hasValidEncryptionKey: {
+      persist: true,
+      anonymous: false,
+    },
+  };
 
 // Messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
@@ -72,7 +97,8 @@ export class SeedlessOnboardingController extends BaseController<
   readonly #encryptor: Encryptor = {
     keyFromPassword: (password, salt, exportable, opts) => {
       const randomSalt = salt || Math.random().toString(36).substring(2, 15);
-      return keyFromPassword(password, randomSalt, exportable, opts);
+      const exportableKey = exportable ?? true;
+      return keyFromPassword(password, randomSalt, exportableKey, opts);
     },
     encryptWithKey,
     decryptWithKey,
@@ -108,6 +134,10 @@ export class SeedlessOnboardingController extends BaseController<
    */
   async authenticateOAuthUser(params: AuthenticateUserParams) {
     const verificationResult = await this.#toprfAuthClient.authenticate(params);
+    this.update((state) => {
+      state.nodeAuthTokens = verificationResult.nodeAuthTokens;
+      state.hasValidEncryptionKey = verificationResult.hasValidEncKey;
+    });
     return verificationResult;
   }
 
@@ -115,18 +145,17 @@ export class SeedlessOnboardingController extends BaseController<
    * @description Backup seed phrase using the seedless onboarding flow.
    * @param params - The parameters for backup seed phrase.
    * @param params.password - The password used to create new wallet and seedphrase
-   * @param params.nodeAuthTokens - The node auth tokens reterieved from the OAuth Authentication
    * @param params.seedPhrase - The seed phrase to backup
    * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
   async createSeedPhraseBackup({
-    nodeAuthTokens,
     password,
     seedPhrase,
   }: CreateSeedlessBackupParams): Promise<{
     encryptedSeedPhrase: string;
     encryptionKey: string;
   }> {
+    const nodeAuthTokens = this.#getNodeAuthTokens();
     const { encKey } = await this.#toprfAuthClient.createEncKey({
       nodeAuthTokens,
       password,
@@ -146,14 +175,11 @@ export class SeedlessOnboardingController extends BaseController<
 
   /**
    * @description Fetch seed phrase metadata from the metadata store.
-   * @param nodeAuthTokens - The node auth tokens reterieved from the OAuth Authentication
    * @param password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhraseMetadata(
-    nodeAuthTokens: NodeAuthTokens,
-    password: string,
-  ) {
+  async fetchAndRestoreSeedPhraseMetadata(password: string) {
+    const nodeAuthTokens = this.#getNodeAuthTokens();
     const { encKey, secretData } = await this.#toprfAuthClient.fetchSecretData({
       nodeAuthTokens,
       password,
@@ -163,6 +189,15 @@ export class SeedlessOnboardingController extends BaseController<
       encryptedSeedPhrase: secretData,
       encryptionKey: encKey,
     };
+  }
+
+  #getNodeAuthTokens() {
+    const { nodeAuthTokens } = this.state;
+    if (!nodeAuthTokens) {
+      // TODO: create standard errors
+      throw new Error('Node auth tokens not found');
+    }
+    return nodeAuthTokens;
   }
 
   #handleKeyringStateChange(_keyringState: KeyringControllerState) {

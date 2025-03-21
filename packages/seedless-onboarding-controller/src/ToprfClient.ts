@@ -28,7 +28,7 @@ export type AuthenticationResult = {
   /**
    * Whether the user is an existing user
    */
-  isExistingUser: boolean;
+  hasValidEncKey: boolean;
 };
 
 export type CreateEncKeyParams = {
@@ -128,6 +128,7 @@ export class ToprfAuthClient {
     const key = `${params.verifier}:${params.verifierID}`;
 
     const stringifiedNodeAuthTokens = this.#mockAuthStore.get(key);
+    const hasValidEncKey = Boolean(stringifiedNodeAuthTokens);
     let nodeAuthTokens: NodeAuthTokens;
 
     if (stringifiedNodeAuthTokens === undefined) {
@@ -147,7 +148,7 @@ export class ToprfAuthClient {
 
     return {
       nodeAuthTokens,
-      isExistingUser: Boolean(stringifiedNodeAuthTokens),
+      hasValidEncKey,
     };
   }
 

@@ -28,7 +28,6 @@ export type NodeAuthToken = {
 export type NodeAuthTokens = NodeAuthToken[];
 
 export type CreateSeedlessBackupParams = {
-  nodeAuthTokens: NodeAuthTokens;
   password: string;
   seedPhrase: string;
 };
