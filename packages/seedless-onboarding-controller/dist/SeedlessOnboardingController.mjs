@@ -9,12 +9,19 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _SeedlessOnboardingController_instances, _SeedlessOnboardingController_encryptor, _SeedlessOnboardingController_toprfAuthClient, _SeedlessOnboardingController_getNodeAuthTokens, _SeedlessOnboardingController_handleKeyringStateChange, _SeedlessOnboardingController_subscribeToMessageEvents;
+var _SeedlessOnboardingController_instances, _SeedlessOnboardingController_encryptor, _SeedlessOnboardingController_getNodeAuthTokens;
 import { BaseController } from "@metamask/base-controller";
 import { encryptWithKey, decryptWithKey, keyFromPassword, generateSalt, importKey, exportKey } from "@metamask/browser-passworder";
+import { SeedlessOnboardingControllerError } from "./constants.mjs";
 import { ToprfAuthClient } from "./ToprfClient.mjs";
 const controllerName = 'SeedlessOnboardingController';
-export const defaultState = {};
+/**
+ * Seedless Onboarding Controller State Metadata.
+ *
+ * This allows us to choose if fields of the state should be persisted or not
+ * using the `persist` flag; and if they can be sent to Sentry or not, using
+ * the `anonymous` flag.
+ */
 const seedlessOnboardingMetadata = {
     nodeAuthTokens: {
         persist: true,
@@ -25,13 +32,16 @@ const seedlessOnboardingMetadata = {
         anonymous: false,
     },
 };
+export const defaultState = {
+    hasValidEncryptionKey: false,
+};
 export class SeedlessOnboardingController extends BaseController {
-    constructor({ messenger, encryptor }) {
+    constructor({ messenger, encryptor, state, }) {
         super({
             messenger,
             metadata: seedlessOnboardingMetadata,
             name: controllerName,
-            state: { ...defaultState },
+            state: { ...state, ...defaultState },
         });
         _SeedlessOnboardingController_instances.add(this);
         _SeedlessOnboardingController_encryptor.set(this, {
@@ -46,12 +56,10 @@ export class SeedlessOnboardingController extends BaseController {
             importKey,
             exportKey,
         });
-        _SeedlessOnboardingController_toprfAuthClient.set(this, void 0);
         if (encryptor) {
             __classPrivateFieldSet(this, _SeedlessOnboardingController_encryptor, encryptor, "f");
         }
-        __classPrivateFieldSet(this, _SeedlessOnboardingController_toprfAuthClient, new ToprfAuthClient(__classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f")), "f");
-        __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_subscribeToMessageEvents).call(this);
+        this.toprfAuthClient = new ToprfAuthClient(__classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f"));
     }
     /**
      * @description Authenticate OAuth user using the seedless onboarding flow
@@ -63,7 +71,7 @@ export class SeedlessOnboardingController extends BaseController {
      * @returns A promise that resolves to the authentication result.
      */
     async authenticateOAuthUser(params) {
-        const verificationResult = await __classPrivateFieldGet(this, _SeedlessOnboardingController_toprfAuthClient, "f").authenticate(params);
+        const verificationResult = await this.toprfAuthClient.authenticate(params);
         this.update((state) => {
             state.nodeAuthTokens = verificationResult.nodeAuthTokens;
             state.hasValidEncryptionKey = verificationResult.hasValidEncKey;
@@ -79,11 +87,11 @@ export class SeedlessOnboardingController extends BaseController {
      */
     async createSeedPhraseBackup({ password, seedPhrase, }) {
         const nodeAuthTokens = __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getNodeAuthTokens).call(this);
-        const { encKey } = await __classPrivateFieldGet(this, _SeedlessOnboardingController_toprfAuthClient, "f").createEncKey({
+        const { encKey } = await this.toprfAuthClient.createEncKey({
             nodeAuthTokens,
             password,
         });
-        const storeResult = await __classPrivateFieldGet(this, _SeedlessOnboardingController_toprfAuthClient, "f").storeSecretData({
+        const storeResult = await this.toprfAuthClient.storeSecretData({
             nodeAuthTokens,
             encKey,
             secretData: seedPhrase,
@@ -99,31 +107,28 @@ export class SeedlessOnboardingController extends BaseController {
      * @returns A promise that resolves to the seed phrase metadata.
      */
     async fetchAndRestoreSeedPhraseMetadata(password) {
-        const nodeAuthTokens = __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getNodeAuthTokens).call(this);
-        const { encKey, secretData } = await __classPrivateFieldGet(this, _SeedlessOnboardingController_toprfAuthClient, "f").fetchSecretData({
-            nodeAuthTokens,
-            password,
-        });
-        return {
-            encryptedSeedPhrase: secretData,
-            encryptionKey: encKey,
-        };
+        try {
+            const nodeAuthTokens = __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getNodeAuthTokens).call(this);
+            const { encKey, secretData } = await this.toprfAuthClient.fetchSecretData({
+                nodeAuthTokens,
+                password,
+            });
+            return {
+                secretData,
+                encryptionKey: encKey,
+            };
+        }
+        catch (error) {
+            console.error('[fetchAndRestoreSeedPhraseMetadata] error', error);
+            throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
+        }
     }
 }
-_SeedlessOnboardingController_encryptor = new WeakMap(), _SeedlessOnboardingController_toprfAuthClient = new WeakMap(), _SeedlessOnboardingController_instances = new WeakSet(), _SeedlessOnboardingController_getNodeAuthTokens = function _SeedlessOnboardingController_getNodeAuthTokens() {
+_SeedlessOnboardingController_encryptor = new WeakMap(), _SeedlessOnboardingController_instances = new WeakSet(), _SeedlessOnboardingController_getNodeAuthTokens = function _SeedlessOnboardingController_getNodeAuthTokens() {
     const { nodeAuthTokens } = this.state;
     if (!nodeAuthTokens) {
-        // TODO: create standard errors
-        throw new Error('Node auth tokens not found');
+        throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
     }
     return nodeAuthTokens;
-}, _SeedlessOnboardingController_handleKeyringStateChange = function _SeedlessOnboardingController_handleKeyringStateChange(_keyringState) {
-    // handle keyring state change
-    // Actions to perform when keyring state changes
-    // 1. when the existing keyring is removed,
-    // 2. when the new keyring is added
-    // 3. when more than one keyring is added
-}, _SeedlessOnboardingController_subscribeToMessageEvents = function _SeedlessOnboardingController_subscribeToMessageEvents() {
-    this.messagingSystem.subscribe('KeyringController:stateChange', (keyringState) => __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_handleKeyringStateChange).call(this, keyringState));
 };
 //# sourceMappingURL=SeedlessOnboardingController.mjs.map

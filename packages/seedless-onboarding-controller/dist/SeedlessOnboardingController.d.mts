@@ -1,6 +1,7 @@
-import type { ControllerGetStateAction, RestrictedMessenger } from "@metamask/base-controller";
+import type { ControllerGetStateAction, ControllerStateChangeEvent, RestrictedMessenger } from "@metamask/base-controller";
 import { BaseController } from "@metamask/base-controller";
 import type { KeyringControllerStateChangeEvent } from "@metamask/keyring-controller";
+import { ToprfAuthClient } from "./ToprfClient.mjs";
 import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, NodeAuthTokens } from "./types.mjs";
 declare const controllerName = "SeedlessOnboardingController";
 export type SeedlessOnboardingControllerState = {
@@ -22,21 +23,27 @@ export type SeedlessOnboardingControllerState = {
     hasValidEncryptionKey?: boolean;
 };
 export type SeedlessOnboardingControllerGetStateActions = ControllerGetStateAction<typeof controllerName, SeedlessOnboardingControllerState>;
-export type AllowedEvents = KeyringControllerStateChangeEvent;
 export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
-export declare const defaultState: SeedlessOnboardingControllerState;
+export type SeedlessOnboardingControllerStateChangeEvent = ControllerStateChangeEvent<typeof controllerName, SeedlessOnboardingControllerState>;
+export type AllowedEvents = KeyringControllerStateChangeEvent | SeedlessOnboardingControllerStateChangeEvent;
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<typeof controllerName, AllowedActions, AllowedEvents, AllowedActions['type'], AllowedEvents['type']>;
 export type SeedlessOnboardingControllerOptions = {
     messenger: SeedlessOnboardingControllerMessenger;
+    /**
+     * @description Initial state to set on this controller.
+     */
+    state?: SeedlessOnboardingControllerState;
     /**
      * @description Encryptor used for encryption and decryption of data.
      * @default WebCryptoAPI
      */
     encryptor?: Encryptor;
 };
+export declare const defaultState: SeedlessOnboardingControllerState;
 export declare class SeedlessOnboardingController extends BaseController<typeof controllerName, SeedlessOnboardingControllerState, SeedlessOnboardingControllerMessenger> {
     #private;
-    constructor({ messenger, encryptor }: SeedlessOnboardingControllerOptions);
+    readonly toprfAuthClient: ToprfAuthClient;
+    constructor({ messenger, encryptor, state, }: SeedlessOnboardingControllerOptions);
     /**
      * @description Authenticate OAuth user using the seedless onboarding flow
      * and determine if the user is already registered or not.
@@ -64,7 +71,7 @@ export declare class SeedlessOnboardingController extends BaseController<typeof 
      * @returns A promise that resolves to the seed phrase metadata.
      */
     fetchAndRestoreSeedPhraseMetadata(password: string): Promise<{
-        encryptedSeedPhrase: string[] | null;
+        secretData: string[] | null;
         encryptionKey: string;
     }>;
 }
