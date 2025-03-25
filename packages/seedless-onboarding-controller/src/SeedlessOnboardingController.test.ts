@@ -18,6 +18,9 @@ function buildSeedlessOnboardingControllerMessenger() {
 }
 
 describe('SeedlessOnboardingController', () => {
+  const MOCK_SEED_PHRASE =
+    'horror pink muffin canal young photo magnet runway start elder patch until';
+
   describe('constructor', () => {
     it('should be able to instantiate', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
@@ -26,12 +29,6 @@ describe('SeedlessOnboardingController', () => {
       });
       expect(controller).toBeDefined();
       expect(controller.state).toStrictEqual({});
-
-      // should subscribe to keyring state change during instantiation
-      expect(messenger.subscribe).toHaveBeenCalledWith(
-        'KeyringController:stateChange',
-        expect.any(Function),
-      );
     });
 
     it('should be able to instantiate with an encryptor', () => {
@@ -93,7 +90,6 @@ describe('SeedlessOnboardingController', () => {
       messenger,
       encryptor,
     });
-    const MOCK_SEED_PHRASE = 'mock-seed-phrase';
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to create a seed phrase backup', async () => {
@@ -129,7 +125,6 @@ describe('SeedlessOnboardingController', () => {
       messenger,
       encryptor,
     });
-    const MOCK_SEED_PHRASE = 'mock-seed-phrase';
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to restore and login with a seed phrase from metadata', async () => {
@@ -150,7 +145,8 @@ describe('SeedlessOnboardingController', () => {
         await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadata).toBeDefined();
-      expect(seedPhraseMetadata.encryptedSeedPhrase).toBeDefined();
+      expect(seedPhraseMetadata.secretData).toBeDefined();
+      expect(seedPhraseMetadata.secretData?.[0]).toBe(MOCK_SEED_PHRASE);
     });
 
     it('should be able to create a seed phrase metadata if it does not exist during login', async () => {
@@ -166,9 +162,7 @@ describe('SeedlessOnboardingController', () => {
         await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
-      expect(
-        seedPhraseMetadataFromMetadataStore.encryptedSeedPhrase,
-      ).toBeNull();
+      expect(seedPhraseMetadataFromMetadataStore.secretData).toBeNull();
 
       await controller.createSeedPhraseBackup({
         seedPhrase: MOCK_SEED_PHRASE,
@@ -179,11 +173,8 @@ describe('SeedlessOnboardingController', () => {
         await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
-      expect(
-        seedPhraseMetadataFromMetadataStore.encryptedSeedPhrase,
-      ).not.toBeNull();
-      const seedPhrase =
-        seedPhraseMetadataFromMetadataStore.encryptedSeedPhrase?.[0];
+      expect(seedPhraseMetadataFromMetadataStore.secretData).not.toBeNull();
+      const seedPhrase = seedPhraseMetadataFromMetadataStore.secretData?.[0];
       expect(seedPhrase).toBe(MOCK_SEED_PHRASE);
     });
   });

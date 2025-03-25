@@ -1,5 +1,6 @@
 import type {
   ControllerGetStateAction,
+  ControllerStateChangeEvent,
   RestrictedMessenger,
   StateMetadata,
 } from '@metamask/base-controller';
@@ -12,11 +13,9 @@ import {
   importKey,
   exportKey,
 } from '@metamask/browser-passworder';
-import type {
-  KeyringControllerState,
-  KeyringControllerStateChangeEvent,
-} from '@metamask/keyring-controller';
+import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
 
+import { SeedlessOnboardingControllerError } from './constants';
 import { ToprfAuthClient } from './ToprfClient';
 import type {
   AuthenticateUserParams,
@@ -54,23 +53,21 @@ export type SeedlessOnboardingControllerGetStateActions =
     SeedlessOnboardingControllerState
   >;
 
-export type AllowedEvents = KeyringControllerStateChangeEvent;
 export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
 
-export const defaultState: SeedlessOnboardingControllerState = {};
-const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
-  {
-    nodeAuthTokens: {
-      persist: true,
-      anonymous: false,
-    },
-    hasValidEncryptionKey: {
-      persist: true,
-      anonymous: false,
-    },
-  };
+export type SeedlessOnboardingControllerStateChangeEvent =
+  ControllerStateChangeEvent<
+    typeof controllerName,
+    SeedlessOnboardingControllerState
+  >;
+
+// events allowed to be subscribed
+export type AllowedEvents =
+  | KeyringControllerStateChangeEvent
+  | SeedlessOnboardingControllerStateChangeEvent;
 
 // Messenger
+// TODO: re-evaluate and remove uncessary events/actions from the messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
   typeof controllerName,
   AllowedActions,
@@ -83,10 +80,38 @@ export type SeedlessOnboardingControllerOptions = {
   messenger: SeedlessOnboardingControllerMessenger;
 
   /**
+   * @description Initial state to set on this controller.
+   */
+  state?: SeedlessOnboardingControllerState;
+
+  /**
    * @description Encryptor used for encryption and decryption of data.
    * @default WebCryptoAPI
    */
   encryptor?: Encryptor;
+};
+
+/**
+ * Seedless Onboarding Controller State Metadata.
+ *
+ * This allows us to choose if fields of the state should be persisted or not
+ * using the `persist` flag; and if they can be sent to Sentry or not, using
+ * the `anonymous` flag.
+ */
+const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
+  {
+    nodeAuthTokens: {
+      persist: true,
+      anonymous: false,
+    },
+    hasValidEncryptionKey: {
+      persist: true,
+      anonymous: false,
+    },
+  };
+
+export const defaultState: SeedlessOnboardingControllerState = {
+  hasValidEncryptionKey: false,
 };
 
 export class SeedlessOnboardingController extends BaseController<
@@ -107,20 +132,23 @@ export class SeedlessOnboardingController extends BaseController<
     exportKey,
   };
 
-  readonly #toprfAuthClient: ToprfAuthClient;
+  readonly toprfAuthClient: ToprfAuthClient;
 
-  constructor({ messenger, encryptor }: SeedlessOnboardingControllerOptions) {
+  constructor({
+    messenger,
+    encryptor,
+    state,
+  }: SeedlessOnboardingControllerOptions) {
     super({
       messenger,
       metadata: seedlessOnboardingMetadata,
       name: controllerName,
-      state: { ...defaultState },
+      state: { ...state, ...defaultState },
     });
     if (encryptor) {
       this.#encryptor = encryptor;
     }
-    this.#toprfAuthClient = new ToprfAuthClient(this.#encryptor);
-    this.#subscribeToMessageEvents();
+    this.toprfAuthClient = new ToprfAuthClient(this.#encryptor);
   }
 
   /**
@@ -133,7 +161,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @returns A promise that resolves to the authentication result.
    */
   async authenticateOAuthUser(params: AuthenticateUserParams) {
-    const verificationResult = await this.#toprfAuthClient.authenticate(params);
+    const verificationResult = await this.toprfAuthClient.authenticate(params);
     this.update((state) => {
       state.nodeAuthTokens = verificationResult.nodeAuthTokens;
       state.hasValidEncryptionKey = verificationResult.hasValidEncKey;
@@ -156,12 +184,12 @@ export class SeedlessOnboardingController extends BaseController<
     encryptionKey: string;
   }> {
     const nodeAuthTokens = this.#getNodeAuthTokens();
-    const { encKey } = await this.#toprfAuthClient.createEncKey({
+    const { encKey } = await this.toprfAuthClient.createEncKey({
       nodeAuthTokens,
       password,
     });
 
-    const storeResult = await this.#toprfAuthClient.storeSecretData({
+    const storeResult = await this.toprfAuthClient.storeSecretData({
       nodeAuthTokens,
       encKey,
       secretData: seedPhrase,
@@ -179,42 +207,34 @@ export class SeedlessOnboardingController extends BaseController<
    * @returns A promise that resolves to the seed phrase metadata.
    */
   async fetchAndRestoreSeedPhraseMetadata(password: string) {
-    const nodeAuthTokens = this.#getNodeAuthTokens();
-    const { encKey, secretData } = await this.#toprfAuthClient.fetchSecretData({
-      nodeAuthTokens,
-      password,
-    });
+    try {
+      const nodeAuthTokens = this.#getNodeAuthTokens();
+      const { encKey, secretData } = await this.toprfAuthClient.fetchSecretData(
+        {
+          nodeAuthTokens,
+          password,
+        },
+      );
 
-    return {
-      encryptedSeedPhrase: secretData,
-      encryptionKey: encKey,
-    };
-  }
-
-  #getNodeAuthTokens() {
-    const { nodeAuthTokens } = this.state;
-    if (!nodeAuthTokens) {
-      // TODO: create standard errors
-      throw new Error('Node auth tokens not found');
+      return {
+        secretData,
+        encryptionKey: encKey,
+      };
+    } catch (error) {
+      console.error('[fetchAndRestoreSeedPhraseMetadata] error', error);
+      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
     }
-    return nodeAuthTokens;
-  }
-
-  #handleKeyringStateChange(_keyringState: KeyringControllerState) {
-    // handle keyring state change
-    // Actions to perform when keyring state changes
-    // 1. when the existing keyring is removed,
-    // 2. when the new keyring is added
-    // 3. when more than one keyring is added
   }
 
   /**
-   * Constructor helper for subscribing to message events.
+   * @description Get the node auth tokens from the state.
+   * @returns The node auth tokens.
    */
-  #subscribeToMessageEvents() {
-    this.messagingSystem.subscribe(
-      'KeyringController:stateChange',
-      (keyringState) => this.#handleKeyringStateChange(keyringState),
-    );
+  #getNodeAuthTokens() {
+    const { nodeAuthTokens } = this.state;
+    if (!nodeAuthTokens) {
+      throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
+    }
+    return nodeAuthTokens;
   }
 }
