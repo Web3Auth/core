@@ -1,5 +1,6 @@
 import type {
   ControllerGetStateAction,
+  ControllerStateChangeEvent,
   RestrictedMessenger,
   StateMetadata,
 } from '@metamask/base-controller';
@@ -52,23 +53,21 @@ export type SeedlessOnboardingControllerGetStateActions =
     SeedlessOnboardingControllerState
   >;
 
-export type AllowedEvents = KeyringControllerStateChangeEvent;
 export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
 
-export const defaultState: SeedlessOnboardingControllerState = {};
-const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
-  {
-    nodeAuthTokens: {
-      persist: true,
-      anonymous: false,
-    },
-    hasValidEncryptionKey: {
-      persist: true,
-      anonymous: false,
-    },
-  };
+export type SeedlessOnboardingControllerStateChangeEvent =
+  ControllerStateChangeEvent<
+    typeof controllerName,
+    SeedlessOnboardingControllerState
+  >;
+
+// events allowed to be subscribed
+export type AllowedEvents =
+  | KeyringControllerStateChangeEvent
+  | SeedlessOnboardingControllerStateChangeEvent;
 
 // Messenger
+// TODO: re-evaluate and remove uncessary events/actions from the messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
   typeof controllerName,
   AllowedActions,
@@ -90,6 +89,29 @@ export type SeedlessOnboardingControllerOptions = {
    * @default WebCryptoAPI
    */
   encryptor?: Encryptor;
+};
+
+/**
+ * Seedless Onboarding Controller State Metadata.
+ *
+ * This allows us to choose if fields of the state should be persisted or not
+ * using the `persist` flag; and if they can be sent to Sentry or not, using
+ * the `anonymous` flag.
+ */
+const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
+  {
+    nodeAuthTokens: {
+      persist: true,
+      anonymous: false,
+    },
+    hasValidEncryptionKey: {
+      persist: true,
+      anonymous: false,
+    },
+  };
+
+export const defaultState: SeedlessOnboardingControllerState = {
+  hasValidEncryptionKey: false,
 };
 
 export class SeedlessOnboardingController extends BaseController<
@@ -204,6 +226,10 @@ export class SeedlessOnboardingController extends BaseController<
     }
   }
 
+  /**
+   * @description Get the node auth tokens from the state.
+   * @returns The node auth tokens.
+   */
   #getNodeAuthTokens() {
     const { nodeAuthTokens } = this.state;
     if (!nodeAuthTokens) {
