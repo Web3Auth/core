@@ -2,7 +2,7 @@ import type { ControllerGetStateAction, ControllerStateChangeEvent, RestrictedMe
 import { BaseController } from "@metamask/base-controller";
 import type { KeyringControllerStateChangeEvent } from "@metamask/keyring-controller";
 import { ToprfAuthClient } from "./ToprfClient.cjs";
-import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, NodeAuthTokens } from "./types.cjs";
+import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, NodeAuthTokens, OAuthVerifier } from "./types.cjs";
 declare const controllerName = "SeedlessOnboardingController";
 export type SeedlessOnboardingControllerState = {
     /**
@@ -61,20 +61,24 @@ export declare class SeedlessOnboardingController extends BaseController<typeof 
     /**
      * @description Backup seed phrase using the seedless onboarding flow.
      * @param params - The parameters for backup seed phrase.
+     * @param params.verifier - The login provider of the user.
+     * @param params.verifierID - The deterministic identifier of the user from the login provider.
      * @param params.password - The password used to create new wallet and seedphrase
      * @param params.seedPhrase - The seed phrase to backup
      * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
      */
-    createSeedPhraseBackup({ password, seedPhrase, }: CreateSeedlessBackupParams): Promise<{
+    createSeedPhraseBackup({ verifier, verifierID, password, seedPhrase, }: CreateSeedlessBackupParams): Promise<{
         encryptedSeedPhrase: string;
         encryptionKey: string;
     }>;
     /**
      * @description Fetch seed phrase metadata from the metadata store.
+     * @param verifier - The login provider of the user.
+     * @param verifierID - The deterministic identifier of the user from the login provider.
      * @param password - The password used to create new wallet and seedphrase
      * @returns A promise that resolves to the seed phrase metadata.
      */
-    fetchAndRestoreSeedPhraseMetadata(password: string): Promise<{
+    fetchAndRestoreSeedPhraseMetadata(verifier: OAuthVerifier, verifierID: string, password: string): Promise<{
         secretData: string[] | null;
         encryptionKey: string;
     }>;

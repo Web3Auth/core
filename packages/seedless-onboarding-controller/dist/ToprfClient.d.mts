@@ -30,6 +30,14 @@ export type CreateEncKeyParams = {
      */
     nodeAuthTokens: NodeAuthTokens;
     /**
+     * The login provider of the user.
+     */
+    verifier: string;
+    /**
+     * The deterministic identifier of the user from the login provider.
+     */
+    verifierID: string;
+    /**
      * The password of the user.
      */
     password: string;
@@ -73,9 +81,9 @@ export type FetchSecretDataParams = {
      */
     nodeAuthTokens: NodeAuthTokens;
     /**
-     * The password of the user.
+     * The key to decrypt the secret data.
      */
-    password: string;
+    encKey: string;
 };
 export type FetchSecretDataResult = {
     /**

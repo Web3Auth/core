@@ -11,7 +11,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _SeedlessOnboardingController_instances, _SeedlessOnboardingController_encryptor, _SeedlessOnboardingController_vaultOperationMutex, _SeedlessOnboardingController_getNodeAuthTokens, _SeedlessOnboardingController_createNewVaultWithAuthData, _SeedlessOnboardingController_updateVault, _SeedlessOnboardingController_withVaultLock, _SeedlessOnboardingController_getSerializedVaultData;
 import { BaseController } from "@metamask/base-controller";
-import { encryptWithKey, decryptWithKey, keyFromPassword, generateSalt, importKey, exportKey } from "@metamask/browser-passworder";
+import { encrypt, decrypt } from "@metamask/browser-passworder";
 import { Mutex } from "async-mutex";
 import { SeedlessOnboardingControllerError } from "./constants.mjs";
 import { ToprfAuthClient } from "./ToprfClient.mjs";
@@ -50,16 +50,8 @@ export class SeedlessOnboardingController extends BaseController {
         });
         _SeedlessOnboardingController_instances.add(this);
         _SeedlessOnboardingController_encryptor.set(this, {
-            keyFromPassword: (password, salt, exportable, opts) => {
-                const randomSalt = salt || Math.random().toString(36).substring(2, 15);
-                const exportableKey = exportable ?? true;
-                return keyFromPassword(password, randomSalt, exportableKey, opts);
-            },
-            encryptWithKey,
-            decryptWithKey,
-            generateSalt,
-            importKey,
-            exportKey,
+            encrypt,
+            decrypt,
         });
         _SeedlessOnboardingController_vaultOperationMutex.set(this, new Mutex());
         if (encryptor) {
@@ -87,15 +79,19 @@ export class SeedlessOnboardingController extends BaseController {
     /**
      * @description Backup seed phrase using the seedless onboarding flow.
      * @param params - The parameters for backup seed phrase.
+     * @param params.verifier - The login provider of the user.
+     * @param params.verifierID - The deterministic identifier of the user from the login provider.
      * @param params.password - The password used to create new wallet and seedphrase
      * @param params.seedPhrase - The seed phrase to backup
      * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
      */
-    async createSeedPhraseBackup({ password, seedPhrase, }) {
+    async createSeedPhraseBackup({ verifier, verifierID, password, seedPhrase, }) {
         const nodeAuthTokens = __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getNodeAuthTokens).call(this);
         const { encKey } = await this.toprfAuthClient.createEncKey({
             nodeAuthTokens,
             password,
+            verifier,
+            verifierID,
         });
         const storeResult = await this.toprfAuthClient.storeSecretData({
             nodeAuthTokens,
@@ -114,15 +110,23 @@ export class SeedlessOnboardingController extends BaseController {
     }
     /**
      * @description Fetch seed phrase metadata from the metadata store.
+     * @param verifier - The login provider of the user.
+     * @param verifierID - The deterministic identifier of the user from the login provider.
      * @param password - The password used to create new wallet and seedphrase
      * @returns A promise that resolves to the seed phrase metadata.
      */
-    async fetchAndRestoreSeedPhraseMetadata(password) {
+    async fetchAndRestoreSeedPhraseMetadata(verifier, verifierID, password) {
         try {
             const nodeAuthTokens = __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getNodeAuthTokens).call(this);
-            const { encKey, secretData } = await this.toprfAuthClient.fetchSecretData({
+            const { encKey } = await this.toprfAuthClient.createEncKey({
                 nodeAuthTokens,
                 password,
+                verifier,
+                verifierID,
+            });
+            const { secretData } = await this.toprfAuthClient.fetchSecretData({
+                nodeAuthTokens,
+                encKey,
             });
             if (secretData && secretData.length > 0) {
                 await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_createNewVaultWithAuthData).call(this, {
@@ -158,15 +162,10 @@ _SeedlessOnboardingController_encryptor = new WeakMap(), _SeedlessOnboardingCont
     });
 }, _SeedlessOnboardingController_updateVault = function _SeedlessOnboardingController_updateVault({ password, vaultData, }) {
     return __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_withVaultLock).call(this, async () => {
-        if (!password) {
-            throw new Error(SeedlessOnboardingControllerError.MissingCredentials);
-        }
+        assertIsValidPassword(password);
         const serializedAuthData = await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getSerializedVaultData).call(this, vaultData);
         const updatedState = {};
-        assertIsValidPassword(password);
-        const key = await __classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f").keyFromPassword(password);
-        const result = await __classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f").encryptWithKey(key, serializedAuthData);
-        updatedState.vault = result.data;
+        updatedState.vault = await __classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f").encrypt(password, serializedAuthData);
         if (!updatedState.vault) {
             throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
         }

@@ -31,22 +31,26 @@ export class ToprfAuthClient {
      */
     async authenticate(params) {
         const key = `${params.verifier}:${params.verifierID}`;
-        const stringifiedNodeAuthTokens = await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").get(key);
-        const hasValidEncKey = Boolean(stringifiedNodeAuthTokens);
+        const authenticationResult = await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").get(key);
+        let hasValidEncKey = false;
         let nodeAuthTokens;
-        if (stringifiedNodeAuthTokens === undefined ||
-            stringifiedNodeAuthTokens === null) {
+        if (authenticationResult === undefined || authenticationResult === null) {
             // generate mock nodeAuthTokens
             nodeAuthTokens = Array.from({ length: params.indexes.length }, (_, index) => ({
                 nodeAuthToken: `nodeAuthToken-${index}-${params.verifier}-${params.verifierID}`,
                 nodeIndex: params.indexes[index],
             }));
-            await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").set(key, JSON.stringify(nodeAuthTokens));
+            const data = JSON.stringify({
+                nodeAuthTokens,
+                hasValidEncKey: false,
+            });
+            await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").set(key, data);
         }
         else {
-            nodeAuthTokens = JSON.parse(stringifiedNodeAuthTokens);
+            const parsedAuthenticationResult = JSON.parse(authenticationResult);
+            nodeAuthTokens = parsedAuthenticationResult.nodeAuthTokens;
+            hasValidEncKey = parsedAuthenticationResult.hasValidEncKey;
         }
-        // TODO: do the threshold check
         return {
             nodeAuthTokens,
             hasValidEncKey,
@@ -60,6 +64,12 @@ export class ToprfAuthClient {
      * @returns The createEncKey result
      */
     async createEncKey(params) {
+        const key = `${params.verifier}:${params.verifierID}`;
+        const data = JSON.stringify({
+            nodeAuthTokens: params.nodeAuthTokens,
+            hasValidEncKey: true,
+        });
+        await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").set(key, data);
         const encKey = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").keyFromPassword(params.password);
         return {
             encKey,
@@ -77,16 +87,14 @@ export class ToprfAuthClient {
         };
     }
     async fetchSecretData(params) {
-        const { encKey } = await this.createEncKey(params);
-        console.log('encKey', encKey);
         const key = params.nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
         const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").get(key);
         console.log('encryptedSecretData', encryptedSecretData);
         const secretData = encryptedSecretData
-            ? __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(encKey, encryptedSecretData)
+            ? __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(params.encKey, encryptedSecretData)
             : null;
         return {
-            encKey,
+            encKey: params.encKey,
             secretData: secretData ? [secretData] : null,
         };
     }
