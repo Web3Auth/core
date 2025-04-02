@@ -5,14 +5,7 @@ import type {
   StateMetadata,
 } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
-import {
-  encryptWithKey,
-  decryptWithKey,
-  keyFromPassword,
-  generateSalt,
-  importKey,
-  exportKey,
-} from '@metamask/browser-passworder';
+import { encrypt, decrypt } from '@metamask/browser-passworder';
 import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
 import { Mutex, type MutexInterface } from 'async-mutex';
 
@@ -23,6 +16,7 @@ import type {
   CreateSeedlessBackupParams,
   Encryptor,
   NodeAuthTokens,
+  OAuthVerifier,
 } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
@@ -141,16 +135,8 @@ export class SeedlessOnboardingController extends BaseController<
   SeedlessOnboardingControllerMessenger
 > {
   readonly #encryptor: Encryptor = {
-    keyFromPassword: (password, salt, exportable, opts) => {
-      const randomSalt = salt || Math.random().toString(36).substring(2, 15);
-      const exportableKey = exportable ?? true;
-      return keyFromPassword(password, randomSalt, exportableKey, opts);
-    },
-    encryptWithKey,
-    decryptWithKey,
-    generateSalt,
-    importKey,
-    exportKey,
+    encrypt,
+    decrypt,
   };
 
   readonly #vaultOperationMutex = new Mutex();
@@ -195,11 +181,15 @@ export class SeedlessOnboardingController extends BaseController<
   /**
    * @description Backup seed phrase using the seedless onboarding flow.
    * @param params - The parameters for backup seed phrase.
+   * @param params.verifier - The login provider of the user.
+   * @param params.verifierID - The deterministic identifier of the user from the login provider.
    * @param params.password - The password used to create new wallet and seedphrase
    * @param params.seedPhrase - The seed phrase to backup
    * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
   async createSeedPhraseBackup({
+    verifier,
+    verifierID,
     password,
     seedPhrase,
   }: CreateSeedlessBackupParams): Promise<{
@@ -210,6 +200,8 @@ export class SeedlessOnboardingController extends BaseController<
     const { encKey } = await this.toprfAuthClient.createEncKey({
       nodeAuthTokens,
       password,
+      verifier,
+      verifierID,
     });
 
     const storeResult = await this.toprfAuthClient.storeSecretData({
@@ -232,18 +224,28 @@ export class SeedlessOnboardingController extends BaseController<
 
   /**
    * @description Fetch seed phrase metadata from the metadata store.
+   * @param verifier - The login provider of the user.
+   * @param verifierID - The deterministic identifier of the user from the login provider.
    * @param password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhraseMetadata(password: string) {
+  async fetchAndRestoreSeedPhraseMetadata(
+    verifier: OAuthVerifier,
+    verifierID: string,
+    password: string,
+  ) {
     try {
       const nodeAuthTokens = this.#getNodeAuthTokens();
-      const { encKey, secretData } = await this.toprfAuthClient.fetchSecretData(
-        {
-          nodeAuthTokens,
-          password,
-        },
-      );
+      const { encKey } = await this.toprfAuthClient.createEncKey({
+        nodeAuthTokens,
+        password,
+        verifier,
+        verifierID,
+      });
+      const { secretData } = await this.toprfAuthClient.fetchSecretData({
+        nodeAuthTokens,
+        encKey,
+      });
 
       if (secretData && secretData.length > 0) {
         await this.#createNewVaultWithAuthData({
@@ -301,21 +303,16 @@ export class SeedlessOnboardingController extends BaseController<
     vaultData: object;
   }): Promise<boolean> {
     return this.#withVaultLock(async () => {
-      if (!password) {
-        throw new Error(SeedlessOnboardingControllerError.MissingCredentials);
-      }
+      assertIsValidPassword(password);
 
       const serializedAuthData = await this.#getSerializedVaultData(vaultData);
 
       const updatedState: Partial<SeedlessOnboardingControllerState> = {};
 
-      assertIsValidPassword(password);
-      const key = await this.#encryptor.keyFromPassword(password);
-      const result = await this.#encryptor.encryptWithKey(
-        key,
+      updatedState.vault = await this.#encryptor.encrypt(
+        password,
         serializedAuthData,
       );
-      updatedState.vault = result.data;
 
       if (!updatedState.vault) {
         throw new Error(SeedlessOnboardingControllerError.MissingVaultData);

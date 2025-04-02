@@ -485,6 +485,9 @@
   "packages/seedless-onboarding-controller/jest.environment.js": {
     "n/no-unsupported-features/node-builtins": 1
   },
+  "packages/seedless-onboarding-controller/tests/mocks/mockEncryptor.ts": {
+    "n/no-unsupported-features/node-builtins": 2
+  },
   "packages/remote-feature-flag-controller/src/utils/user-segmentation-utils.ts": {
     "jsdoc/tag-lines": 2
   },
