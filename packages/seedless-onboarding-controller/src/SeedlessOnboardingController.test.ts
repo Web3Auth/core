@@ -1,7 +1,7 @@
+import { EncryptorDecryptor } from './encryption';
 import type { SeedlessOnboardingControllerMessenger } from './SeedlessOnboardingController';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
 import MockVaultEncryptor from '../tests/mocks/testEncryptor';
-import { EncryptorDecryptor } from './encryption';
 
 /**
  * Creates a mock user operation messenger.
