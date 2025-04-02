@@ -5,14 +5,7 @@ import type {
   StateMetadata,
 } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
-import {
-  encryptWithKey,
-  decryptWithKey,
-  keyFromPassword,
-  generateSalt,
-  importKey,
-  exportKey,
-} from '@metamask/browser-passworder';
+import { encrypt, decrypt } from '@metamask/browser-passworder';
 import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
 import { Mutex, type MutexInterface } from 'async-mutex';
 
@@ -142,16 +135,8 @@ export class SeedlessOnboardingController extends BaseController<
   SeedlessOnboardingControllerMessenger
 > {
   readonly #encryptor: Encryptor = {
-    keyFromPassword: (password, salt, exportable, opts) => {
-      const randomSalt = salt || Math.random().toString(36).substring(2, 15);
-      const exportableKey = exportable ?? true;
-      return keyFromPassword(password, randomSalt, exportableKey, opts);
-    },
-    encryptWithKey,
-    decryptWithKey,
-    generateSalt,
-    importKey,
-    exportKey,
+    encrypt,
+    decrypt,
   };
 
   readonly #vaultOperationMutex = new Mutex();
@@ -318,21 +303,16 @@ export class SeedlessOnboardingController extends BaseController<
     vaultData: object;
   }): Promise<boolean> {
     return this.#withVaultLock(async () => {
-      if (!password) {
-        throw new Error(SeedlessOnboardingControllerError.MissingCredentials);
-      }
+      assertIsValidPassword(password);
 
       const serializedAuthData = await this.#getSerializedVaultData(vaultData);
 
       const updatedState: Partial<SeedlessOnboardingControllerState> = {};
 
-      assertIsValidPassword(password);
-      const key = await this.#encryptor.keyFromPassword(password);
-      const result = await this.#encryptor.encryptWithKey(
-        key,
+      updatedState.vault = await this.#encryptor.encrypt(
+        password,
         serializedAuthData,
       );
-      updatedState.vault = result.data;
 
       if (!updatedState.vault) {
         throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
