@@ -1,6 +1,7 @@
 export class MetadataStore {
   // Mock Metadata Store URL
-  readonly #baseURL: string = 'http://localhost:5051/eval';
+  readonly #baseURL: string =
+    'https://node-2.dev-node.web3auth.io/metadata/eval';
 
   readonly #keyPrefix: string;
 
