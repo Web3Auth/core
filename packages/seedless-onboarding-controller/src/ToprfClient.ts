@@ -37,6 +37,14 @@ export type CreateEncKeyParams = {
    */
   nodeAuthTokens: NodeAuthTokens;
   /**
+   * The login provider of the user.
+   */
+  verifier: string;
+  /**
+   * The deterministic identifier of the user from the login provider.
+   */
+  verifierID: string;
+  /**
    * The password of the user.
    */
   password: string;
@@ -84,9 +92,9 @@ export type FetchSecretDataParams = {
    */
   nodeAuthTokens: NodeAuthTokens;
   /**
-   * The password of the user.
+   * The key to decrypt the secret data.
    */
-  password: string;
+  encKey: string;
 };
 
 export type FetchSecretDataResult = {
@@ -126,14 +134,11 @@ export class ToprfAuthClient {
     params: AuthenticationParams,
   ): Promise<AuthenticationResult> {
     const key = `${params.verifier}:${params.verifierID}`;
-    const stringifiedNodeAuthTokens = await this.#mockAuthStore.get(key);
-    const hasValidEncKey = Boolean(stringifiedNodeAuthTokens);
+    const authenticationResult = await this.#mockAuthStore.get(key);
+    let hasValidEncKey = false;
     let nodeAuthTokens: NodeAuthTokens;
 
-    if (
-      stringifiedNodeAuthTokens === undefined ||
-      stringifiedNodeAuthTokens === null
-    ) {
+    if (authenticationResult === undefined || authenticationResult === null) {
       // generate mock nodeAuthTokens
       nodeAuthTokens = Array.from(
         { length: params.indexes.length },
@@ -142,11 +147,16 @@ export class ToprfAuthClient {
           nodeIndex: params.indexes[index],
         }),
       );
-      await this.#mockAuthStore.set(key, JSON.stringify(nodeAuthTokens));
+      const data = JSON.stringify({
+        nodeAuthTokens,
+        hasValidEncKey: false,
+      });
+      await this.#mockAuthStore.set(key, data);
     } else {
-      nodeAuthTokens = JSON.parse(stringifiedNodeAuthTokens);
+      const parsedAuthenticationResult = JSON.parse(authenticationResult);
+      nodeAuthTokens = parsedAuthenticationResult.nodeAuthTokens;
+      hasValidEncKey = parsedAuthenticationResult.hasValidEncKey;
     }
-    // TODO: do the threshold check
 
     return {
       nodeAuthTokens,
@@ -162,6 +172,13 @@ export class ToprfAuthClient {
    * @returns The createEncKey result
    */
   async createEncKey(params: CreateEncKeyParams): Promise<CreateEncKeyResult> {
+    const key = `${params.verifier}:${params.verifierID}`;
+    const data = JSON.stringify({
+      nodeAuthTokens: params.nodeAuthTokens,
+      hasValidEncKey: true,
+    });
+    await this.#mockAuthStore.set(key, data);
+
     const encKey = this.#encryptor.keyFromPassword(params.password);
     return {
       encKey,
@@ -192,9 +209,6 @@ export class ToprfAuthClient {
   async fetchSecretData(
     params: FetchSecretDataParams,
   ): Promise<FetchSecretDataResult> {
-    const { encKey } = await this.createEncKey(params);
-    console.log('encKey', encKey);
-
     const key = params.nodeAuthTokens.reduce(
       (acc, token) => `${acc}:${token.nodeAuthToken}`,
       '',
@@ -203,11 +217,11 @@ export class ToprfAuthClient {
     console.log('encryptedSecretData', encryptedSecretData);
 
     const secretData = encryptedSecretData
-      ? this.#encryptor.decrypt(encKey, encryptedSecretData)
+      ? this.#encryptor.decrypt(params.encKey, encryptedSecretData)
       : null;
 
     return {
-      encKey,
+      encKey: params.encKey,
       secretData: secretData ? [secretData] : null,
     };
   }

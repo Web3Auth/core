@@ -28,6 +28,8 @@ export type NodeAuthToken = {
 export type NodeAuthTokens = NodeAuthToken[];
 
 export type CreateSeedlessBackupParams = {
+  verifier: OAuthVerifier;
+  verifierID: string;
   password: string;
   seedPhrase: string;
 };
