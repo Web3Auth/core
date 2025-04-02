@@ -14,6 +14,7 @@ import {
   exportKey,
 } from '@metamask/browser-passworder';
 import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
+import { Mutex, type MutexInterface } from 'async-mutex';
 
 import { SeedlessOnboardingControllerError } from './constants';
 import { ToprfAuthClient } from './ToprfClient';
@@ -26,8 +27,24 @@ import type {
 
 const controllerName = 'SeedlessOnboardingController';
 
+/**
+ * A function executed within a mutually exclusive lock, with
+ * a mutex releaser in its option bag.
+ *
+ * @param releaseLock - A function to release the lock.
+ */
+type MutuallyExclusiveCallback<Result> = ({
+  releaseLock,
+}: {
+  releaseLock: MutexInterface.Releaser;
+}) => Promise<Result>;
+
 // State
 export type SeedlessOnboardingControllerState = {
+  /**
+   * Encrypted array of serialized keyrings data.
+   */
+  vault?: string;
   /**
    * The node auth tokens from OAuth User authentication after the Social login.
    *
@@ -100,13 +117,17 @@ export type SeedlessOnboardingControllerOptions = {
  */
 const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerState> =
   {
-    nodeAuthTokens: {
+    vault: {
       persist: true,
       anonymous: false,
     },
     hasValidEncryptionKey: {
       persist: true,
       anonymous: false,
+    },
+    nodeAuthTokens: {
+      persist: false,
+      anonymous: true,
     },
   };
 
@@ -132,6 +153,8 @@ export class SeedlessOnboardingController extends BaseController<
     exportKey,
   };
 
+  readonly #vaultOperationMutex = new Mutex();
+
   readonly toprfAuthClient: ToprfAuthClient;
 
   constructor({
@@ -148,7 +171,7 @@ export class SeedlessOnboardingController extends BaseController<
     if (encryptor) {
       this.#encryptor = encryptor;
     }
-    this.toprfAuthClient = new ToprfAuthClient(this.#encryptor);
+    this.toprfAuthClient = new ToprfAuthClient();
   }
 
   /**
@@ -195,6 +218,12 @@ export class SeedlessOnboardingController extends BaseController<
       secretData: seedPhrase,
     });
 
+    await this.#createNewVaultWithAuthData({
+      password,
+      authTokens: nodeAuthTokens,
+      toprfEncryptionKey: storeResult.encKey,
+    });
+
     return {
       encryptedSeedPhrase: storeResult.encryptedSecretData,
       encryptionKey: storeResult.encKey,
@@ -216,6 +245,14 @@ export class SeedlessOnboardingController extends BaseController<
         },
       );
 
+      if (secretData && secretData.length > 0) {
+        await this.#createNewVaultWithAuthData({
+          password,
+          authTokens: nodeAuthTokens,
+          toprfEncryptionKey: encKey,
+        });
+      }
+
       return {
         secretData,
         encryptionKey: encKey,
@@ -236,5 +273,118 @@ export class SeedlessOnboardingController extends BaseController<
       throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
     }
     return nodeAuthTokens;
+  }
+
+  async #createNewVaultWithAuthData({
+    password,
+    authTokens,
+    toprfEncryptionKey,
+  }: {
+    password: string;
+    authTokens: NodeAuthTokens;
+    toprfEncryptionKey: string;
+  }): Promise<void> {
+    await this.#updateVault({
+      password,
+      vaultData: {
+        authTokens,
+        toprfEncryptionKey,
+      },
+    });
+  }
+
+  #updateVault({
+    password,
+    vaultData,
+  }: {
+    password: string;
+    vaultData: object;
+  }): Promise<boolean> {
+    return this.#withVaultLock(async () => {
+      if (!password) {
+        throw new Error(SeedlessOnboardingControllerError.MissingCredentials);
+      }
+
+      const serializedAuthData = await this.#getSerializedVaultData(vaultData);
+
+      const updatedState: Partial<SeedlessOnboardingControllerState> = {};
+
+      assertIsValidPassword(password);
+      const key = await this.#encryptor.keyFromPassword(password);
+      const result = await this.#encryptor.encryptWithKey(
+        key,
+        serializedAuthData,
+      );
+      updatedState.vault = result.data;
+
+      if (!updatedState.vault) {
+        throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
+      }
+
+      this.update((state) => {
+        state.vault = updatedState.vault;
+      });
+
+      return true;
+    });
+  }
+
+  /**
+   * Lock the vault mutex before executing the given function,
+   * and release it after the function is resolved or after an
+   * error is thrown.
+   *
+   * This ensures that each operation that interacts with the vault
+   * is executed in a mutually exclusive way.
+   *
+   * @param callback - The function to execute while the vault mutex is locked.
+   * @returns The result of the function.
+   */
+  async #withVaultLock<Result>(
+    callback: MutuallyExclusiveCallback<Result>,
+  ): Promise<Result> {
+    return withLock(this.#vaultOperationMutex, callback);
+  }
+
+  async #getSerializedVaultData(data: object): Promise<string> {
+    return JSON.stringify(data);
+  }
+}
+
+/**
+ * Assert that the provided password is a valid non-empty string.
+ *
+ * @param password - The password to check.
+ * @throws If the password is not a valid string.
+ */
+function assertIsValidPassword(password: unknown): asserts password is string {
+  if (typeof password !== 'string') {
+    throw new Error(SeedlessOnboardingControllerError.WrongPasswordType);
+  }
+
+  if (!password || !password.length) {
+    throw new Error(SeedlessOnboardingControllerError.InvalidEmptyPassword);
+  }
+}
+
+/**
+ * Lock the given mutex before executing the given function,
+ * and release it after the function is resolved or after an
+ * error is thrown.
+ *
+ * @param mutex - The mutex to lock.
+ * @param callback - The function to execute while the mutex is locked.
+ * @returns The result of the function.
+ */
+async function withLock<Result>(
+  mutex: Mutex,
+  callback: MutuallyExclusiveCallback<Result>,
+): Promise<Result> {
+  const releaseLock = await mutex.acquire();
+
+  try {
+    return await callback({ releaseLock });
+  } finally {
+    releaseLock();
   }
 }
