@@ -1,6 +1,7 @@
 import type { SeedlessOnboardingControllerMessenger } from './SeedlessOnboardingController';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
-import TestEncryptor from '../tests/mocks/testEncryptor';
+import MockVaultEncryptor from '../tests/mocks/testEncryptor';
+import { EncryptorDecryptor } from './encryption';
 
 /**
  * Creates a mock user operation messenger.
@@ -33,7 +34,7 @@ describe('SeedlessOnboardingController', () => {
 
     it('should be able to instantiate with an encryptor', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
-      const encryptor = new TestEncryptor();
+      const encryptor = new MockVaultEncryptor();
 
       expect(
         () =>
@@ -47,7 +48,7 @@ describe('SeedlessOnboardingController', () => {
 
   // TODO: add tests for cases where the threshold check fails
   describe('authenticate', () => {
-    const encryptor = new TestEncryptor();
+    const encryptor = new MockVaultEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
@@ -84,11 +85,10 @@ describe('SeedlessOnboardingController', () => {
   });
 
   describe('createSeedPhraseBackup', () => {
-    const encryptor = new TestEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor,
+      encryptor: new MockVaultEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 
@@ -108,22 +108,22 @@ describe('SeedlessOnboardingController', () => {
 
       expect(seedPhraseBackup).toBeDefined();
 
+      const encryptorDecryptor = new EncryptorDecryptor();
       const encryptedString = seedPhraseBackup.encryptedSeedPhrase;
-      const decryptionKey = await encryptor.keyFromPassword(MOCK_PASSWORD);
-      const decryptedString = await encryptor.decryptWithKey(
+      const decryptionKey = encryptorDecryptor.keyFromPassword(MOCK_PASSWORD);
+      const decryptedString = encryptorDecryptor.decrypt(
         decryptionKey,
-        JSON.parse(encryptedString),
+        encryptedString,
       );
       expect(decryptedString).toBe(MOCK_SEED_PHRASE);
     });
   });
 
   describe('restoreAndLoginWithSeedPhrase', () => {
-    const encryptor = new TestEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor,
+      encryptor: new MockVaultEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 

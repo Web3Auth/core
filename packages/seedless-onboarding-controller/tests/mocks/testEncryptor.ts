@@ -5,7 +5,7 @@ import type {
 } from '@metamask/browser-passworder';
 import { webcrypto } from 'node:crypto';
 
-export default class TestEncryptor {
+export default class MockVaultEncryptor {
   DEFAULT_DERIVATION_PARAMS: KeyDerivationOptions = {
     algorithm: 'PBKDF2',
     params: {

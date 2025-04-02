@@ -171,7 +171,7 @@ export class SeedlessOnboardingController extends BaseController<
     if (encryptor) {
       this.#encryptor = encryptor;
     }
-    this.toprfAuthClient = new ToprfAuthClient(this.#encryptor);
+    this.toprfAuthClient = new ToprfAuthClient();
   }
 
   /**

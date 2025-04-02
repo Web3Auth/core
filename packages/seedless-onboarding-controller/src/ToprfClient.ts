@@ -1,6 +1,6 @@
-import type { EncryptionResult } from '@metamask/browser-passworder';
-
-import type { Encryptor, NodeAuthTokens } from './types';
+import { EncryptorDecryptor } from './encryption';
+import { MetadataStore } from './MetadataStore';
+import type { NodeAuthTokens } from './types';
 
 export type AuthenticationParams = {
   // for now we only support one idToken, in future we will support multiple to remove commitment call
@@ -101,50 +101,19 @@ export type FetchSecretDataResult = {
   secretData: string[] | null;
 };
 
-// TODO: remove this store, this is only used for mocking the toprf-sdk before it's ready
-class Store {
-  async set(key: string, value: string) {
-    const response = await fetch('http://localhost:8080/set', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-      body: JSON.stringify({ key, value }),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to set value');
-    }
-  }
-
-  async get(key: string): Promise<string | undefined> {
-    const response = await fetch('http://localhost:8080/get', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-      body: JSON.stringify({ key }),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to get value');
-    }
-    const data = await response.json();
-    return data.value;
-  }
-}
-
 // TODO: remove the class once the toprf-sdk is ready
 // This class is a mock implementation for the toprf-sdk
 export class ToprfAuthClient {
-  readonly #mockAuthStore: Store = new Store();
+  readonly #mockAuthStore: MetadataStore = new MetadataStore('auth');
 
-  readonly #mockMetadataStore: Store = new Store();
+  readonly #mockMetadataStore: MetadataStore = new MetadataStore('metadata');
 
   // TODO: remove this once the toprf-sdk is ready
   // encryptions/signings should be done in the toprf-sdk
-  readonly #encryptor: Encryptor;
+  readonly #encryptor: EncryptorDecryptor;
 
-  constructor(encryptor: Encryptor) {
-    this.#encryptor = encryptor;
+  constructor() {
+    this.#encryptor = new EncryptorDecryptor();
   }
 
   /**
@@ -156,12 +125,15 @@ export class ToprfAuthClient {
   async authenticate(
     params: AuthenticationParams,
   ): Promise<AuthenticationResult> {
-    const key = `auth_${params.verifier}:${params.verifierID}`;
+    const key = `${params.verifier}:${params.verifierID}`;
     const stringifiedNodeAuthTokens = await this.#mockAuthStore.get(key);
     const hasValidEncKey = Boolean(stringifiedNodeAuthTokens);
     let nodeAuthTokens: NodeAuthTokens;
 
-    if (stringifiedNodeAuthTokens === undefined) {
+    if (
+      stringifiedNodeAuthTokens === undefined ||
+      stringifiedNodeAuthTokens === null
+    ) {
       // generate mock nodeAuthTokens
       nodeAuthTokens = Array.from(
         { length: params.indexes.length },
@@ -190,16 +162,7 @@ export class ToprfAuthClient {
    * @returns The createEncKey result
    */
   async createEncKey(params: CreateEncKeyParams): Promise<CreateEncKeyResult> {
-    // NOTE: this is a mock implementation
-    // actual implementation involves threshold oprf
-    const salt = 'SALT';
-    const cryptoKey = await this.#encryptor.keyFromPassword(
-      params.password,
-      salt,
-    );
-    const key = 'key' in cryptoKey ? cryptoKey.key : cryptoKey;
-    const encKey = await this.#encryptor.exportKey(key);
-
+    const encKey = this.#encryptor.keyFromPassword(params.password);
     return {
       encKey,
     };
@@ -210,14 +173,13 @@ export class ToprfAuthClient {
   ): Promise<StoreSecretDataResult> {
     const { nodeAuthTokens, encKey, secretData } = params;
 
-    const encryptedSecretData = await this.#encryptSecretData(
-      encKey,
-      secretData,
-    );
+    const encryptedSecretData = this.#encryptor.encrypt(encKey, secretData);
+
+    console.log('encryptedSecretData', encryptedSecretData);
 
     const key = nodeAuthTokens.reduce(
       (acc, token) => `${acc}:${token.nodeAuthToken}`,
-      'metadata_',
+      '',
     );
     await this.#mockMetadataStore.set(key, encryptedSecretData);
 
@@ -231,53 +193,22 @@ export class ToprfAuthClient {
     params: FetchSecretDataParams,
   ): Promise<FetchSecretDataResult> {
     const { encKey } = await this.createEncKey(params);
+    console.log('encKey', encKey);
 
     const key = params.nodeAuthTokens.reduce(
       (acc, token) => `${acc}:${token.nodeAuthToken}`,
-      'metadata_',
+      '',
     );
     const encryptedSecretData = await this.#mockMetadataStore.get(key);
+    console.log('encryptedSecretData', encryptedSecretData);
 
     const secretData = encryptedSecretData
-      ? await this.#decryptSecretData(encKey, encryptedSecretData)
+      ? this.#encryptor.decrypt(encKey, encryptedSecretData)
       : null;
 
     return {
       encKey,
       secretData: secretData ? [secretData] : null,
     };
-  }
-
-  async #encryptSecretData(
-    encKeyString: string,
-    secretData: string,
-  ): Promise<string> {
-    const encryptionKey = await this.#encryptor.importKey(encKeyString);
-    const encryptedSecretData = await this.#encryptor.encryptWithKey(
-      encryptionKey,
-      secretData,
-    );
-
-    return JSON.stringify(encryptedSecretData);
-  }
-
-  async #decryptSecretData(
-    encKeyString: string,
-    encryptedSecretData: string,
-  ): Promise<string> {
-    let encryptedResult: EncryptionResult;
-    try {
-      encryptedResult = JSON.parse(encryptedSecretData) as EncryptionResult;
-    } catch (error: unknown) {
-      console.error(error);
-      throw new Error('Fail to encrypt. Invalid data');
-    }
-    const decryptionKey = await this.#encryptor.importKey(encKeyString);
-    const decryptedResult = await this.#encryptor.decryptWithKey(
-      decryptionKey,
-      encryptedResult,
-    );
-
-    return decryptedResult as string;
   }
 }
