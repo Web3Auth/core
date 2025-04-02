@@ -9,47 +9,19 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _ToprfAuthClient_instances, _ToprfAuthClient_mockAuthStore, _ToprfAuthClient_mockMetadataStore, _ToprfAuthClient_encryptor, _ToprfAuthClient_encryptSecretData, _ToprfAuthClient_decryptSecretData;
-// TODO: remove this store, this is only used for mocking the toprf-sdk before it's ready
-class Store {
-    async set(key, value) {
-        const response = await fetch('http://localhost:8080/set', {
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            method: 'POST',
-            body: JSON.stringify({ key, value }),
-        });
-        if (!response.ok) {
-            throw new Error('Failed to set value');
-        }
-    }
-    async get(key) {
-        const response = await fetch('http://localhost:8080/get', {
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            method: 'POST',
-            body: JSON.stringify({ key }),
-        });
-        if (!response.ok) {
-            throw new Error('Failed to get value');
-        }
-        const data = await response.json();
-        return data.value;
-    }
-}
+var _ToprfAuthClient_mockAuthStore, _ToprfAuthClient_mockMetadataStore, _ToprfAuthClient_encryptor;
+import { EncryptorDecryptor } from "./encryption.mjs";
+import { MetadataStore } from "./MetadataStore.mjs";
 // TODO: remove the class once the toprf-sdk is ready
 // This class is a mock implementation for the toprf-sdk
 export class ToprfAuthClient {
-    constructor(encryptor) {
-        _ToprfAuthClient_instances.add(this);
-        _ToprfAuthClient_mockAuthStore.set(this, new Store());
-        _ToprfAuthClient_mockMetadataStore.set(this, new Store());
+    constructor() {
+        _ToprfAuthClient_mockAuthStore.set(this, new MetadataStore('auth'));
+        _ToprfAuthClient_mockMetadataStore.set(this, new MetadataStore('metadata'));
         // TODO: remove this once the toprf-sdk is ready
         // encryptions/signings should be done in the toprf-sdk
         _ToprfAuthClient_encryptor.set(this, void 0);
-        __classPrivateFieldSet(this, _ToprfAuthClient_encryptor, encryptor, "f");
+        __classPrivateFieldSet(this, _ToprfAuthClient_encryptor, new EncryptorDecryptor(), "f");
     }
     /**
      * Mock implementation of the authenticate method
@@ -58,11 +30,12 @@ export class ToprfAuthClient {
      * @returns The authentication result
      */
     async authenticate(params) {
-        const key = `auth_${params.verifier}:${params.verifierID}`;
+        const key = `${params.verifier}:${params.verifierID}`;
         const stringifiedNodeAuthTokens = await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").get(key);
         const hasValidEncKey = Boolean(stringifiedNodeAuthTokens);
         let nodeAuthTokens;
-        if (stringifiedNodeAuthTokens === undefined) {
+        if (stringifiedNodeAuthTokens === undefined ||
+            stringifiedNodeAuthTokens === null) {
             // generate mock nodeAuthTokens
             nodeAuthTokens = Array.from({ length: params.indexes.length }, (_, index) => ({
                 nodeAuthToken: `nodeAuthToken-${index}-${params.verifier}-${params.verifierID}`,
@@ -87,20 +60,16 @@ export class ToprfAuthClient {
      * @returns The createEncKey result
      */
     async createEncKey(params) {
-        // NOTE: this is a mock implementation
-        // actual implementation involves threshold oprf
-        const salt = 'SALT';
-        const cryptoKey = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").keyFromPassword(params.password, salt);
-        const key = 'key' in cryptoKey ? cryptoKey.key : cryptoKey;
-        const encKey = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").exportKey(key);
+        const encKey = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").keyFromPassword(params.password);
         return {
             encKey,
         };
     }
     async storeSecretData(params) {
         const { nodeAuthTokens, encKey, secretData } = params;
-        const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_instances, "m", _ToprfAuthClient_encryptSecretData).call(this, encKey, secretData);
-        const key = nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, 'metadata_');
+        const encryptedSecretData = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").encrypt(encKey, secretData);
+        console.log('encryptedSecretData', encryptedSecretData);
+        const key = nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
         await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").set(key, encryptedSecretData);
         return {
             encKey,
@@ -109,10 +78,12 @@ export class ToprfAuthClient {
     }
     async fetchSecretData(params) {
         const { encKey } = await this.createEncKey(params);
-        const key = params.nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, 'metadata_');
+        console.log('encKey', encKey);
+        const key = params.nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
         const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").get(key);
+        console.log('encryptedSecretData', encryptedSecretData);
         const secretData = encryptedSecretData
-            ? await __classPrivateFieldGet(this, _ToprfAuthClient_instances, "m", _ToprfAuthClient_decryptSecretData).call(this, encKey, encryptedSecretData)
+            ? __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(encKey, encryptedSecretData)
             : null;
         return {
             encKey,
@@ -120,21 +91,5 @@ export class ToprfAuthClient {
         };
     }
 }
-_ToprfAuthClient_mockAuthStore = new WeakMap(), _ToprfAuthClient_mockMetadataStore = new WeakMap(), _ToprfAuthClient_encryptor = new WeakMap(), _ToprfAuthClient_instances = new WeakSet(), _ToprfAuthClient_encryptSecretData = async function _ToprfAuthClient_encryptSecretData(encKeyString, secretData) {
-    const encryptionKey = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").importKey(encKeyString);
-    const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").encryptWithKey(encryptionKey, secretData);
-    return JSON.stringify(encryptedSecretData);
-}, _ToprfAuthClient_decryptSecretData = async function _ToprfAuthClient_decryptSecretData(encKeyString, encryptedSecretData) {
-    let encryptedResult;
-    try {
-        encryptedResult = JSON.parse(encryptedSecretData);
-    }
-    catch (error) {
-        console.error(error);
-        throw new Error('Fail to encrypt. Invalid data');
-    }
-    const decryptionKey = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").importKey(encKeyString);
-    const decryptedResult = await __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decryptWithKey(decryptionKey, encryptedResult);
-    return decryptedResult;
-};
+_ToprfAuthClient_mockAuthStore = new WeakMap(), _ToprfAuthClient_mockMetadataStore = new WeakMap(), _ToprfAuthClient_encryptor = new WeakMap();
 //# sourceMappingURL=ToprfClient.mjs.map

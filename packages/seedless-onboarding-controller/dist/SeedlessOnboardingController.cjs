@@ -10,11 +10,12 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _SeedlessOnboardingController_instances, _SeedlessOnboardingController_encryptor, _SeedlessOnboardingController_getNodeAuthTokens;
+var _SeedlessOnboardingController_instances, _SeedlessOnboardingController_encryptor, _SeedlessOnboardingController_vaultOperationMutex, _SeedlessOnboardingController_getNodeAuthTokens, _SeedlessOnboardingController_createNewVaultWithAuthData, _SeedlessOnboardingController_updateVault, _SeedlessOnboardingController_withVaultLock, _SeedlessOnboardingController_getSerializedVaultData;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SeedlessOnboardingController = exports.defaultState = void 0;
 const base_controller_1 = require("@metamask/base-controller");
 const browser_passworder_1 = require("@metamask/browser-passworder");
+const async_mutex_1 = require("async-mutex");
 const constants_1 = require("./constants.cjs");
 const ToprfClient_1 = require("./ToprfClient.cjs");
 const controllerName = 'SeedlessOnboardingController';
@@ -26,13 +27,17 @@ const controllerName = 'SeedlessOnboardingController';
  * the `anonymous` flag.
  */
 const seedlessOnboardingMetadata = {
-    nodeAuthTokens: {
+    vault: {
         persist: true,
         anonymous: false,
     },
     hasValidEncryptionKey: {
         persist: true,
         anonymous: false,
+    },
+    nodeAuthTokens: {
+        persist: false,
+        anonymous: true,
     },
 };
 exports.defaultState = {
@@ -59,10 +64,11 @@ class SeedlessOnboardingController extends base_controller_1.BaseController {
             importKey: browser_passworder_1.importKey,
             exportKey: browser_passworder_1.exportKey,
         });
+        _SeedlessOnboardingController_vaultOperationMutex.set(this, new async_mutex_1.Mutex());
         if (encryptor) {
             __classPrivateFieldSet(this, _SeedlessOnboardingController_encryptor, encryptor, "f");
         }
-        this.toprfAuthClient = new ToprfClient_1.ToprfAuthClient(__classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f"));
+        this.toprfAuthClient = new ToprfClient_1.ToprfAuthClient();
     }
     /**
      * @description Authenticate OAuth user using the seedless onboarding flow
@@ -99,6 +105,11 @@ class SeedlessOnboardingController extends base_controller_1.BaseController {
             encKey,
             secretData: seedPhrase,
         });
+        await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_createNewVaultWithAuthData).call(this, {
+            password,
+            authTokens: nodeAuthTokens,
+            toprfEncryptionKey: storeResult.encKey,
+        });
         return {
             encryptedSeedPhrase: storeResult.encryptedSecretData,
             encryptionKey: storeResult.encKey,
@@ -116,6 +127,13 @@ class SeedlessOnboardingController extends base_controller_1.BaseController {
                 nodeAuthTokens,
                 password,
             });
+            if (secretData && secretData.length > 0) {
+                await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_createNewVaultWithAuthData).call(this, {
+                    password,
+                    authTokens: nodeAuthTokens,
+                    toprfEncryptionKey: encKey,
+                });
+            }
             return {
                 secretData,
                 encryptionKey: encKey,
@@ -128,11 +146,86 @@ class SeedlessOnboardingController extends base_controller_1.BaseController {
     }
 }
 exports.SeedlessOnboardingController = SeedlessOnboardingController;
-_SeedlessOnboardingController_encryptor = new WeakMap(), _SeedlessOnboardingController_instances = new WeakSet(), _SeedlessOnboardingController_getNodeAuthTokens = function _SeedlessOnboardingController_getNodeAuthTokens() {
+_SeedlessOnboardingController_encryptor = new WeakMap(), _SeedlessOnboardingController_vaultOperationMutex = new WeakMap(), _SeedlessOnboardingController_instances = new WeakSet(), _SeedlessOnboardingController_getNodeAuthTokens = function _SeedlessOnboardingController_getNodeAuthTokens() {
     const { nodeAuthTokens } = this.state;
     if (!nodeAuthTokens) {
         throw new Error(constants_1.SeedlessOnboardingControllerError.NoOAuthIdToken);
     }
     return nodeAuthTokens;
+}, _SeedlessOnboardingController_createNewVaultWithAuthData = async function _SeedlessOnboardingController_createNewVaultWithAuthData({ password, authTokens, toprfEncryptionKey, }) {
+    await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_updateVault).call(this, {
+        password,
+        vaultData: {
+            authTokens,
+            toprfEncryptionKey,
+        },
+    });
+}, _SeedlessOnboardingController_updateVault = function _SeedlessOnboardingController_updateVault({ password, vaultData, }) {
+    return __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_withVaultLock).call(this, async () => {
+        if (!password) {
+            throw new Error(constants_1.SeedlessOnboardingControllerError.MissingCredentials);
+        }
+        const serializedAuthData = await __classPrivateFieldGet(this, _SeedlessOnboardingController_instances, "m", _SeedlessOnboardingController_getSerializedVaultData).call(this, vaultData);
+        const updatedState = {};
+        assertIsValidPassword(password);
+        const key = await __classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f").keyFromPassword(password);
+        const result = await __classPrivateFieldGet(this, _SeedlessOnboardingController_encryptor, "f").encryptWithKey(key, serializedAuthData);
+        updatedState.vault = result.data;
+        if (!updatedState.vault) {
+            throw new Error(constants_1.SeedlessOnboardingControllerError.MissingVaultData);
+        }
+        this.update((state) => {
+            state.vault = updatedState.vault;
+        });
+        return true;
+    });
+}, _SeedlessOnboardingController_withVaultLock = 
+/**
+ * Lock the vault mutex before executing the given function,
+ * and release it after the function is resolved or after an
+ * error is thrown.
+ *
+ * This ensures that each operation that interacts with the vault
+ * is executed in a mutually exclusive way.
+ *
+ * @param callback - The function to execute while the vault mutex is locked.
+ * @returns The result of the function.
+ */
+async function _SeedlessOnboardingController_withVaultLock(callback) {
+    return withLock(__classPrivateFieldGet(this, _SeedlessOnboardingController_vaultOperationMutex, "f"), callback);
+}, _SeedlessOnboardingController_getSerializedVaultData = async function _SeedlessOnboardingController_getSerializedVaultData(data) {
+    return JSON.stringify(data);
 };
+/**
+ * Assert that the provided password is a valid non-empty string.
+ *
+ * @param password - The password to check.
+ * @throws If the password is not a valid string.
+ */
+function assertIsValidPassword(password) {
+    if (typeof password !== 'string') {
+        throw new Error(constants_1.SeedlessOnboardingControllerError.WrongPasswordType);
+    }
+    if (!password || !password.length) {
+        throw new Error(constants_1.SeedlessOnboardingControllerError.InvalidEmptyPassword);
+    }
+}
+/**
+ * Lock the given mutex before executing the given function,
+ * and release it after the function is resolved or after an
+ * error is thrown.
+ *
+ * @param mutex - The mutex to lock.
+ * @param callback - The function to execute while the mutex is locked.
+ * @returns The result of the function.
+ */
+async function withLock(mutex, callback) {
+    const releaseLock = await mutex.acquire();
+    try {
+        return await callback({ releaseLock });
+    }
+    finally {
+        releaseLock();
+    }
+}
 //# sourceMappingURL=SeedlessOnboardingController.cjs.map

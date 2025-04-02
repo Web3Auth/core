@@ -6,6 +6,10 @@ import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, Nod
 declare const controllerName = "SeedlessOnboardingController";
 export type SeedlessOnboardingControllerState = {
     /**
+     * Encrypted array of serialized keyrings data.
+     */
+    vault?: string;
+    /**
      * The node auth tokens from OAuth User authentication after the Social login.
      *
      * This values are used to authenticate users when they go through the Seedless Onboarding flow.

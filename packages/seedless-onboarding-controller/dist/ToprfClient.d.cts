@@ -1,4 +1,4 @@
-import type { Encryptor, NodeAuthTokens } from "./types.cjs";
+import type { NodeAuthTokens } from "./types.cjs";
 export type AuthenticationParams = {
     idTokens: string[];
     endpoints: string[];
@@ -90,7 +90,7 @@ export type FetchSecretDataResult = {
 };
 export declare class ToprfAuthClient {
     #private;
-    constructor(encryptor: Encryptor);
+    constructor();
     /**
      * Mock implementation of the authenticate method
      *
