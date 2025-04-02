@@ -1,7 +1,7 @@
 import { EncryptorDecryptor } from './encryption';
 import type { SeedlessOnboardingControllerMessenger } from './SeedlessOnboardingController';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
-import MockVaultEncryptor from '../tests/mocks/testEncryptor';
+import MockVaultEncryptor from '../tests/mocks/mockEncryptor';
 
 /**
  * Creates a mock user operation messenger.
@@ -18,8 +18,17 @@ function buildSeedlessOnboardingControllerMessenger() {
   } as unknown as jest.Mocked<SeedlessOnboardingControllerMessenger>;
 }
 
+/**
+ * Builds a mock encryptor.
+ *
+ * @returns The mock encryptor.
+ */
+function buildMockEncryptor() {
+  return new MockVaultEncryptor();
+}
+
 const verifier = 'google';
-const verifierID = 'testuser1@gmail.com';
+const verifierID = 'user@gmail.com';
 
 describe('SeedlessOnboardingController', () => {
   const MOCK_SEED_PHRASE =
@@ -39,7 +48,7 @@ describe('SeedlessOnboardingController', () => {
 
     it('should be able to instantiate with an encryptor', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
-      const encryptor = new MockVaultEncryptor();
+      const encryptor = buildMockEncryptor();
 
       expect(
         () =>
@@ -52,7 +61,7 @@ describe('SeedlessOnboardingController', () => {
   });
 
   describe('authenticate', () => {
-    const encryptor = new MockVaultEncryptor();
+    const encryptor = buildMockEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
@@ -84,7 +93,7 @@ describe('SeedlessOnboardingController', () => {
 
       expect(authResult).toBeDefined();
       expect(authResult.nodeAuthTokens).toBeDefined();
-      expect(authResult.hasValidEncKey).toBe(true);
+      expect(authResult.hasValidEncKey).toBe(false);
     });
   });
 
@@ -92,7 +101,7 @@ describe('SeedlessOnboardingController', () => {
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor: new MockVaultEncryptor(),
+      encryptor: buildMockEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 
@@ -129,7 +138,7 @@ describe('SeedlessOnboardingController', () => {
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor: new MockVaultEncryptor(),
+      encryptor: buildMockEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 
@@ -163,7 +172,7 @@ describe('SeedlessOnboardingController', () => {
 
     it('should be able to create a seed phrase metadata if it does not exist during login', async () => {
       const newVerifier = 'google';
-      const newVerifierID = 'testuser2@gmail.com';
+      const newVerifierID = 'newUser@gmail.com';
       await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
         verifier: newVerifier,

@@ -128,4 +128,43 @@ export default class MockVaultEncryptor {
 
     return decryptedObj;
   }
+
+  async encrypt<R>(
+    password: string,
+    dataObj: R,
+    key?: EncryptionKey | CryptoKey,
+    salt: string = this.DEFAULT_SALT,
+    keyDerivationOptions = this.DEFAULT_DERIVATION_PARAMS,
+  ): Promise<string> {
+    const cryptoKey =
+      key ||
+      (await this.keyFromPassword(password, salt, false, keyDerivationOptions));
+    const payload = await this.encryptWithKey(cryptoKey, dataObj);
+    payload.salt = salt;
+    return JSON.stringify(payload);
+  }
+
+  async decrypt(
+    password: string,
+    text: string,
+    encryptionKey?: EncryptionKey | CryptoKey,
+  ): Promise<unknown> {
+    const payload = JSON.parse(text);
+    const { salt, keyMetadata } = payload;
+
+    let cryptoKey = encryptionKey;
+    if (!cryptoKey) {
+      cryptoKey = await this.keyFromPassword(
+        password,
+        salt,
+        false,
+        keyMetadata,
+      );
+    }
+
+    const key = 'key' in cryptoKey ? cryptoKey.key : cryptoKey;
+
+    const result = await this.decryptWithKey(key, payload);
+    return result;
+  }
 }
