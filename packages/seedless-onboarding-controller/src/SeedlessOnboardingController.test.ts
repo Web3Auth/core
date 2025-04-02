@@ -18,6 +18,9 @@ function buildSeedlessOnboardingControllerMessenger() {
   } as unknown as jest.Mocked<SeedlessOnboardingControllerMessenger>;
 }
 
+const verifier = 'google';
+const verifierID = 'testuser1@gmail.com';
+
 describe('SeedlessOnboardingController', () => {
   const MOCK_SEED_PHRASE =
     'horror pink muffin canal young photo magnet runway start elder patch until';
@@ -29,7 +32,9 @@ describe('SeedlessOnboardingController', () => {
         messenger,
       });
       expect(controller).toBeDefined();
-      expect(controller.state).toStrictEqual({});
+      expect(controller.state).toStrictEqual({
+        hasValidEncryptionKey: false,
+      });
     });
 
     it('should be able to instantiate with an encryptor', () => {
@@ -46,7 +51,6 @@ describe('SeedlessOnboardingController', () => {
     });
   });
 
-  // TODO: add tests for cases where the threshold check fails
   describe('authenticate', () => {
     const encryptor = new MockVaultEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
@@ -58,8 +62,8 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to register a new user', async () => {
       const authResult = await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
-        verifier: 'google',
-        verifierID: 'test-user',
+        verifier,
+        verifierID,
         endpoints: ['https://example.com'],
         indexes: [1],
       });
@@ -72,8 +76,8 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to authenticate an existing user', async () => {
       const authResult = await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
-        verifier: 'google',
-        verifierID: 'test-user',
+        verifier,
+        verifierID,
         endpoints: ['https://example.com'],
         indexes: [1],
       });
@@ -95,13 +99,15 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to create a seed phrase backup', async () => {
       await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
-        verifier: 'google',
-        verifierID: 'test-user',
+        verifier,
+        verifierID,
         endpoints: ['https://example.com'],
         indexes: [1],
       });
 
       const seedPhraseBackup = await controller.createSeedPhraseBackup({
+        verifier,
+        verifierID,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
@@ -130,19 +136,25 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to restore and login with a seed phrase from metadata', async () => {
       await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
-        verifier: 'google',
-        verifierID: 'test-user',
+        verifier,
+        verifierID,
         endpoints: ['https://example.com'],
         indexes: [1],
       });
 
       await controller.createSeedPhraseBackup({
+        verifier,
+        verifierID,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
 
       const seedPhraseMetadata =
-        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
+        await controller.fetchAndRestoreSeedPhraseMetadata(
+          verifier,
+          verifierID,
+          MOCK_PASSWORD,
+        );
 
       expect(seedPhraseMetadata).toBeDefined();
       expect(seedPhraseMetadata.secretData).toBeDefined();
@@ -150,27 +162,39 @@ describe('SeedlessOnboardingController', () => {
     });
 
     it('should be able to create a seed phrase metadata if it does not exist during login', async () => {
+      const newVerifier = 'google';
+      const newVerifierID = 'testuser2@gmail.com';
       await controller.authenticateOAuthUser({
         idTokens: ['idToken'],
-        verifier: 'apple',
-        verifierID: 'test-user-2',
+        verifier: newVerifier,
+        verifierID: newVerifierID,
         endpoints: ['https://example.com'],
         indexes: [1],
       });
 
       let seedPhraseMetadataFromMetadataStore =
-        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
+        await controller.fetchAndRestoreSeedPhraseMetadata(
+          newVerifier,
+          newVerifierID,
+          MOCK_PASSWORD,
+        );
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(seedPhraseMetadataFromMetadataStore.secretData).toBeNull();
 
       await controller.createSeedPhraseBackup({
+        verifier: newVerifier,
+        verifierID: newVerifierID,
         seedPhrase: MOCK_SEED_PHRASE,
         password: MOCK_PASSWORD,
       });
 
       seedPhraseMetadataFromMetadataStore =
-        await controller.fetchAndRestoreSeedPhraseMetadata(MOCK_PASSWORD);
+        await controller.fetchAndRestoreSeedPhraseMetadata(
+          newVerifier,
+          newVerifierID,
+          MOCK_PASSWORD,
+        );
 
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(seedPhraseMetadataFromMetadataStore.secretData).not.toBeNull();

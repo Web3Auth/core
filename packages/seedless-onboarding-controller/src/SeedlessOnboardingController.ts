@@ -23,6 +23,7 @@ import type {
   CreateSeedlessBackupParams,
   Encryptor,
   NodeAuthTokens,
+  OAuthVerifier,
 } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
@@ -195,11 +196,15 @@ export class SeedlessOnboardingController extends BaseController<
   /**
    * @description Backup seed phrase using the seedless onboarding flow.
    * @param params - The parameters for backup seed phrase.
+   * @param params.verifier - The login provider of the user.
+   * @param params.verifierID - The deterministic identifier of the user from the login provider.
    * @param params.password - The password used to create new wallet and seedphrase
    * @param params.seedPhrase - The seed phrase to backup
    * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
   async createSeedPhraseBackup({
+    verifier,
+    verifierID,
     password,
     seedPhrase,
   }: CreateSeedlessBackupParams): Promise<{
@@ -210,6 +215,8 @@ export class SeedlessOnboardingController extends BaseController<
     const { encKey } = await this.toprfAuthClient.createEncKey({
       nodeAuthTokens,
       password,
+      verifier,
+      verifierID,
     });
 
     const storeResult = await this.toprfAuthClient.storeSecretData({
@@ -232,18 +239,28 @@ export class SeedlessOnboardingController extends BaseController<
 
   /**
    * @description Fetch seed phrase metadata from the metadata store.
+   * @param verifier - The login provider of the user.
+   * @param verifierID - The deterministic identifier of the user from the login provider.
    * @param password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhraseMetadata(password: string) {
+  async fetchAndRestoreSeedPhraseMetadata(
+    verifier: OAuthVerifier,
+    verifierID: string,
+    password: string,
+  ) {
     try {
       const nodeAuthTokens = this.#getNodeAuthTokens();
-      const { encKey, secretData } = await this.toprfAuthClient.fetchSecretData(
-        {
-          nodeAuthTokens,
-          password,
-        },
-      );
+      const { encKey } = await this.toprfAuthClient.createEncKey({
+        nodeAuthTokens,
+        password,
+        verifier,
+        verifierID,
+      });
+      const { secretData } = await this.toprfAuthClient.fetchSecretData({
+        nodeAuthTokens,
+        encKey,
+      });
 
       if (secretData && secretData.length > 0) {
         await this.#createNewVaultWithAuthData({
