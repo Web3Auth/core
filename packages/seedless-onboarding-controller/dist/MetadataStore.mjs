@@ -13,26 +13,29 @@ var _MetadataStore_baseURL, _MetadataStore_keyPrefix;
 export class MetadataStore {
     constructor(keyPrefix) {
         // Mock Metadata Store URL
-        _MetadataStore_baseURL.set(this, 'https://node-2.dev-node.web3auth.io/metadata/eval');
+        _MetadataStore_baseURL.set(this, 'https://mock-simple-auth.sapphire-dev-2-1.authnetwork.dev');
         _MetadataStore_keyPrefix.set(this, void 0);
         __classPrivateFieldSet(this, _MetadataStore_keyPrefix, keyPrefix, "f");
     }
     async set(key, data) {
+        const url = `${__classPrivateFieldGet(this, _MetadataStore_baseURL, "f")}/${__classPrivateFieldGet(this, _MetadataStore_keyPrefix, "f")}/set`;
         const metadataKey = `${__classPrivateFieldGet(this, _MetadataStore_keyPrefix, "f")}_${key}`;
-        const response = await fetch(`${__classPrivateFieldGet(this, _MetadataStore_baseURL, "f")}/option-2-write`, {
+        const payload = JSON.stringify({ key: metadataKey, data });
+        const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json',
             },
             method: 'POST',
-            body: JSON.stringify({ key: metadataKey, data }),
+            body: payload,
         });
         if (!response.ok) {
             throw new Error('Failed to set data');
         }
     }
     async get(key) {
+        const url = `${__classPrivateFieldGet(this, _MetadataStore_baseURL, "f")}/${__classPrivateFieldGet(this, _MetadataStore_keyPrefix, "f")}/get`;
         const metadataKey = `${__classPrivateFieldGet(this, _MetadataStore_keyPrefix, "f")}_${key}`;
-        const response = await fetch(`${__classPrivateFieldGet(this, _MetadataStore_baseURL, "f")}/option-2-read`, {
+        const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json',
             },
