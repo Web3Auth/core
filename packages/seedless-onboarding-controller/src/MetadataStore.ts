@@ -1,7 +1,7 @@
 export class MetadataStore {
   // Mock Metadata Store URL
   readonly #baseURL: string =
-    'mock-simple-auth.sapphire-dev-2-1.authnetwork.dev';
+    'https://mock-simple-auth.sapphire-dev-2-1.authnetwork.dev';
 
   readonly #keyPrefix: string;
 
