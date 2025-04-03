@@ -1,7 +1,7 @@
 export class MetadataStore {
   // Mock Metadata Store URL
   readonly #baseURL: string =
-    'https://node-2.dev-node.web3auth.io/metadata/eval';
+    'https://mock-simple-auth.sapphire-dev-2-1.authnetwork.dev';
 
   readonly #keyPrefix: string;
 
@@ -10,14 +10,16 @@ export class MetadataStore {
   }
 
   async set(key: string, data: string) {
+    const url = `${this.#baseURL}/${this.#keyPrefix}/set`;
     const metadataKey = `${this.#keyPrefix}_${key}`;
+    const payload = JSON.stringify({ key: metadataKey, data });
 
-    const response = await fetch(`${this.#baseURL}/option-2-write`, {
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
       },
       method: 'POST',
-      body: JSON.stringify({ key: metadataKey, data }),
+      body: payload,
     });
     if (!response.ok) {
       throw new Error('Failed to set data');
@@ -25,9 +27,10 @@ export class MetadataStore {
   }
 
   async get(key: string): Promise<string | undefined> {
+    const url = `${this.#baseURL}/${this.#keyPrefix}/get`;
     const metadataKey = `${this.#keyPrefix}_${key}`;
 
-    const response = await fetch(`${this.#baseURL}/option-2-read`, {
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
       },
