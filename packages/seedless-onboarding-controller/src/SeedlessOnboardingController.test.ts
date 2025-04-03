@@ -28,7 +28,7 @@ function buildMockEncryptor() {
 }
 
 const verifier = 'google';
-const verifierID = 'user@gmail.com';
+const verifierID = 'user-test@gmail.com';
 
 describe('SeedlessOnboardingController', () => {
   const MOCK_SEED_PHRASE =
