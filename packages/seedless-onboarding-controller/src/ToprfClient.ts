@@ -138,7 +138,8 @@ export class ToprfAuthClient {
     let hasValidEncKey = false;
     let nodeAuthTokens: NodeAuthTokens;
 
-    if (authenticationResult === undefined || authenticationResult === null) {
+    const isValidAuthResponse = this.#isValidAuthResponse(authenticationResult);
+    if (authenticationResult === undefined || !isValidAuthResponse) {
       // generate mock nodeAuthTokens
       nodeAuthTokens = Array.from(
         { length: params.indexes.length },
@@ -149,13 +150,13 @@ export class ToprfAuthClient {
       );
       const data = JSON.stringify({
         nodeAuthTokens,
-        hasValidEncKey: false,
+        hasValidEncKey,
       });
       await this.#mockAuthStore.set(key, data);
     } else {
       const parsedAuthenticationResult = JSON.parse(authenticationResult);
       nodeAuthTokens = parsedAuthenticationResult.nodeAuthTokens;
-      hasValidEncKey = parsedAuthenticationResult.hasValidEncKey;
+      hasValidEncKey = Boolean(parsedAuthenticationResult.hasValidEncKey);
     }
 
     return {
@@ -192,8 +193,6 @@ export class ToprfAuthClient {
 
     const encryptedSecretData = this.#encryptor.encrypt(encKey, secretData);
 
-    console.log('encryptedSecretData', encryptedSecretData);
-
     const key = nodeAuthTokens.reduce(
       (acc, token) => `${acc}:${token.nodeAuthToken}`,
       '',
@@ -214,7 +213,6 @@ export class ToprfAuthClient {
       '',
     );
     const encryptedSecretData = await this.#mockMetadataStore.get(key);
-    console.log('encryptedSecretData', encryptedSecretData);
 
     const secretData = encryptedSecretData
       ? this.#encryptor.decrypt(params.encKey, encryptedSecretData)
@@ -224,5 +222,15 @@ export class ToprfAuthClient {
       encKey: params.encKey,
       secretData: secretData ? [secretData] : null,
     };
+  }
+
+  #isValidAuthResponse(authResponse: string | null | undefined): boolean {
+    if (authResponse === undefined || authResponse === null) {
+      return false;
+    }
+
+    const parsedAuthResponse = JSON.parse(authResponse);
+
+    return parsedAuthResponse.nodeAuthTokens !== undefined;
   }
 }
