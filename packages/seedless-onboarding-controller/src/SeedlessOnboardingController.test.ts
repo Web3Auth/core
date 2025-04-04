@@ -1,6 +1,12 @@
 import { EncryptorDecryptor } from './encryption';
 import type { SeedlessOnboardingControllerMessenger } from './SeedlessOnboardingController';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
+import {
+  handleMockAuthGet,
+  handleMockAuthSet,
+  handleMockMetadataGet,
+  handleMockMetadataSet,
+} from '../tests/__fixtures__/topfClient';
 import MockVaultEncryptor from '../tests/mocks/mockEncryptor';
 
 /**
@@ -23,17 +29,28 @@ function buildSeedlessOnboardingControllerMessenger() {
  *
  * @returns The mock encryptor.
  */
-function buildMockEncryptor() {
+function createMockEncryptor() {
   return new MockVaultEncryptor();
+}
+
+/**
+ * Builds a mock ToprfEncryptor.
+ *
+ * @returns The mock ToprfEncryptor.
+ */
+function createMockToprfEncryptor() {
+  return new EncryptorDecryptor();
 }
 
 const verifier = 'google';
 const verifierID = 'user-test@gmail.com';
+const idTokens = ['idToken'];
+const endpoints = ['https://example.com'];
+const indexes = [1];
+const MOCK_SEED_PHRASE =
+  'horror pink muffin canal young photo magnet runway start elder patch until';
 
 describe('SeedlessOnboardingController', () => {
-  const MOCK_SEED_PHRASE =
-    'horror pink muffin canal young photo magnet runway start elder patch until';
-
   describe('constructor', () => {
     it('should be able to instantiate', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
@@ -48,7 +65,7 @@ describe('SeedlessOnboardingController', () => {
 
     it('should be able to instantiate with an encryptor', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
-      const encryptor = buildMockEncryptor();
+      const encryptor = createMockEncryptor();
 
       expect(
         () =>
@@ -61,7 +78,7 @@ describe('SeedlessOnboardingController', () => {
   });
 
   describe('authenticate', () => {
-    const encryptor = buildMockEncryptor();
+    const encryptor = createMockEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
@@ -69,13 +86,22 @@ describe('SeedlessOnboardingController', () => {
     });
 
     it('should be able to register a new user', async () => {
+      const mockAuthGet = handleMockAuthGet({
+        status: 200,
+        body: { success: true },
+      });
+      const mockAuthSet = handleMockAuthSet();
+
       const authResult = await controller.authenticateOAuthUser({
-        idTokens: ['idToken'],
+        idTokens,
         verifier,
         verifierID,
-        endpoints: ['https://example.com'],
-        indexes: [1],
+        endpoints,
+        indexes,
       });
+
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(true);
 
       expect(authResult).toBeDefined();
       expect(authResult.nodeAuthTokens).toBeDefined();
@@ -83,13 +109,19 @@ describe('SeedlessOnboardingController', () => {
     });
 
     it('should be able to authenticate an existing user', async () => {
+      const mockAuthGet = handleMockAuthGet();
+      const mockAuthSet = handleMockAuthSet();
+
       const authResult = await controller.authenticateOAuthUser({
-        idTokens: ['idToken'],
+        idTokens,
         verifier,
         verifierID,
-        endpoints: ['https://example.com'],
-        indexes: [1],
+        endpoints,
+        indexes,
       });
+
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(false);
 
       expect(authResult).toBeDefined();
       expect(authResult.nodeAuthTokens).toBeDefined();
@@ -101,19 +133,26 @@ describe('SeedlessOnboardingController', () => {
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor: buildMockEncryptor(),
+      encryptor: createMockEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to create a seed phrase backup', async () => {
+      const mockAuthGet = handleMockAuthGet();
+      const mockAuthSet = handleMockAuthSet();
+
       await controller.authenticateOAuthUser({
-        idTokens: ['idToken'],
+        idTokens,
         verifier,
         verifierID,
-        endpoints: ['https://example.com'],
-        indexes: [1],
+        endpoints,
+        indexes,
       });
 
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(false);
+
+      const mockMetadataSet = handleMockMetadataSet();
       const seedPhraseBackup = await controller.createSeedPhraseBackup({
         verifier,
         verifierID,
@@ -121,6 +160,9 @@ describe('SeedlessOnboardingController', () => {
         password: MOCK_PASSWORD,
       });
 
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(true);
+      expect(mockMetadataSet.isDone()).toBe(true);
       expect(seedPhraseBackup).toBeDefined();
 
       const encryptorDecryptor = new EncryptorDecryptor();
@@ -135,22 +177,30 @@ describe('SeedlessOnboardingController', () => {
   });
 
   describe('restoreAndLoginWithSeedPhrase', () => {
+    const mockToprfEncryptor = createMockToprfEncryptor();
     const messenger = buildSeedlessOnboardingControllerMessenger();
     const controller = new SeedlessOnboardingController({
       messenger,
-      encryptor: buildMockEncryptor(),
+      encryptor: createMockEncryptor(),
     });
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to restore and login with a seed phrase from metadata', async () => {
+      const mockAuthGet = handleMockAuthGet();
+      const mockAuthSet = handleMockAuthSet();
+
       await controller.authenticateOAuthUser({
-        idTokens: ['idToken'],
+        idTokens,
         verifier,
         verifierID,
-        endpoints: ['https://example.com'],
-        indexes: [1],
+        endpoints,
+        indexes,
       });
 
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(false);
+
+      const mockMetadataSet = handleMockMetadataSet();
       await controller.createSeedPhraseBackup({
         verifier,
         verifierID,
@@ -158,6 +208,20 @@ describe('SeedlessOnboardingController', () => {
         password: MOCK_PASSWORD,
       });
 
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(true);
+      expect(mockMetadataSet.isDone()).toBe(true);
+
+      const mockMetadataGet = handleMockMetadataGet({
+        status: 200,
+        body: {
+          success: true,
+          message: mockToprfEncryptor.encrypt(
+            mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            MOCK_SEED_PHRASE,
+          ),
+        },
+      });
       const seedPhraseMetadata =
         await controller.fetchAndRestoreSeedPhraseMetadata(
           verifier,
@@ -165,6 +229,7 @@ describe('SeedlessOnboardingController', () => {
           MOCK_PASSWORD,
         );
 
+      expect(mockMetadataGet.isDone()).toBe(true);
       expect(seedPhraseMetadata).toBeDefined();
       expect(seedPhraseMetadata.secretData).toBeDefined();
       expect(seedPhraseMetadata.secretData?.[0]).toBe(MOCK_SEED_PHRASE);
@@ -173,14 +238,24 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to create a seed phrase metadata if it does not exist during login', async () => {
       const newVerifier = 'google';
       const newVerifierID = 'newUser@gmail.com';
+      const mockAuthGet = handleMockAuthGet();
+      const mockAuthSet = handleMockAuthSet();
+
       await controller.authenticateOAuthUser({
-        idTokens: ['idToken'],
+        idTokens,
         verifier: newVerifier,
         verifierID: newVerifierID,
-        endpoints: ['https://example.com'],
-        indexes: [1],
+        endpoints,
+        indexes,
       });
 
+      expect(mockAuthGet.isDone()).toBe(true);
+      expect(mockAuthSet.isDone()).toBe(false);
+
+      const mockMetadataGet = handleMockMetadataGet({
+        status: 200,
+        body: { success: true },
+      });
       let seedPhraseMetadataFromMetadataStore =
         await controller.fetchAndRestoreSeedPhraseMetadata(
           newVerifier,
@@ -188,9 +263,11 @@ describe('SeedlessOnboardingController', () => {
           MOCK_PASSWORD,
         );
 
+      expect(mockMetadataGet.isDone()).toBe(true);
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(seedPhraseMetadataFromMetadataStore.secretData).toBeNull();
 
+      const mockMetadataSet = handleMockMetadataSet();
       await controller.createSeedPhraseBackup({
         verifier: newVerifier,
         verifierID: newVerifierID,
@@ -198,6 +275,18 @@ describe('SeedlessOnboardingController', () => {
         password: MOCK_PASSWORD,
       });
 
+      expect(mockMetadataSet.isDone()).toBe(true);
+
+      const mockMetadataGet2 = handleMockMetadataGet({
+        status: 200,
+        body: {
+          success: true,
+          message: mockToprfEncryptor.encrypt(
+            mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            MOCK_SEED_PHRASE,
+          ),
+        },
+      });
       seedPhraseMetadataFromMetadataStore =
         await controller.fetchAndRestoreSeedPhraseMetadata(
           newVerifier,
@@ -205,6 +294,7 @@ describe('SeedlessOnboardingController', () => {
           MOCK_PASSWORD,
         );
 
+      expect(mockMetadataGet2.isDone()).toBe(true);
       expect(seedPhraseMetadataFromMetadataStore).toBeDefined();
       expect(seedPhraseMetadataFromMetadataStore.secretData).not.toBeNull();
       const seedPhrase = seedPhraseMetadataFromMetadataStore.secretData?.[0];
