@@ -1,3 +1,4 @@
+import { SeedlessOnboardingControllerError } from './constants';
 import { EncryptorDecryptor } from './encryption';
 import { MetadataStore } from './MetadataStore';
 import type { NodeAuthTokens } from './types';
@@ -173,17 +174,21 @@ export class ToprfAuthClient {
    * @returns The createEncKey result
    */
   async createEncKey(params: CreateEncKeyParams): Promise<CreateEncKeyResult> {
-    const key = `${params.verifier}:${params.verifierID}`;
-    const data = JSON.stringify({
-      nodeAuthTokens: params.nodeAuthTokens,
-      hasValidEncKey: true,
-    });
-    await this.#mockAuthStore.set(key, data);
+    try {
+      const key = `${params.verifier}:${params.verifierID}`;
+      const data = JSON.stringify({
+        nodeAuthTokens: params.nodeAuthTokens,
+        hasValidEncKey: true,
+      });
+      await this.#mockAuthStore.set(key, data);
 
-    const encKey = this.#encryptor.keyFromPassword(params.password);
-    return {
-      encKey,
-    };
+      const encKey = this.#encryptor.keyFromPassword(params.password);
+      return {
+        encKey,
+      };
+    } catch (e) {
+      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
+    }
   }
 
   async storeSecretData(
@@ -214,9 +219,14 @@ export class ToprfAuthClient {
     );
     const encryptedSecretData = await this.#mockMetadataStore.get(key);
 
-    const secretData = encryptedSecretData
-      ? this.#encryptor.decrypt(params.encKey, encryptedSecretData)
-      : null;
+    let secretData: string | null = null;
+    try {
+      secretData = encryptedSecretData
+        ? this.#encryptor.decrypt(params.encKey, encryptedSecretData)
+        : null;
+    } catch (e) {
+      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
+    }
 
     return {
       encKey: params.encKey,

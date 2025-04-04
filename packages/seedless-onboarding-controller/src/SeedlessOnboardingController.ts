@@ -234,35 +234,30 @@ export class SeedlessOnboardingController extends BaseController<
     verifierID: string,
     password: string,
   ) {
-    try {
-      const nodeAuthTokens = this.#getNodeAuthTokens();
-      const { encKey } = await this.toprfAuthClient.createEncKey({
-        nodeAuthTokens,
+    const nodeAuthTokens = this.#getNodeAuthTokens();
+    const { encKey } = await this.toprfAuthClient.createEncKey({
+      nodeAuthTokens,
+      password,
+      verifier,
+      verifierID,
+    });
+    const { secretData } = await this.toprfAuthClient.fetchSecretData({
+      nodeAuthTokens,
+      encKey,
+    });
+
+    if (secretData && secretData.length > 0) {
+      await this.#createNewVaultWithAuthData({
         password,
-        verifier,
-        verifierID,
+        authTokens: nodeAuthTokens,
+        toprfEncryptionKey: encKey,
       });
-      const { secretData } = await this.toprfAuthClient.fetchSecretData({
-        nodeAuthTokens,
-        encKey,
-      });
-
-      if (secretData && secretData.length > 0) {
-        await this.#createNewVaultWithAuthData({
-          password,
-          authTokens: nodeAuthTokens,
-          toprfEncryptionKey: encKey,
-        });
-      }
-
-      return {
-        secretData,
-        encryptionKey: encKey,
-      };
-    } catch (error) {
-      console.error('[fetchAndRestoreSeedPhraseMetadata] error', error);
-      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
     }
+
+    return {
+      secretData,
+      encryptionKey: encKey,
+    };
   }
 
   /**
