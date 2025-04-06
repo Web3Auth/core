@@ -5,6 +5,8 @@ import type {
 } from '@metamask/browser-passworder';
 import { webcrypto } from 'node:crypto';
 
+import { SeedlessOnboardingControllerError } from '../../src/constants';
+
 export default class MockVaultEncryptor {
   DEFAULT_DERIVATION_PARAMS: KeyDerivationOptions = {
     algorithm: 'PBKDF2',
@@ -123,7 +125,7 @@ export default class MockVaultEncryptor {
       decryptedObj = JSON.parse(decryptedStr);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e: unknown) {
-      throw new Error('Failed to decrypt');
+      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
     }
 
     return decryptedObj;

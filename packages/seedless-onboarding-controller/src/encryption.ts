@@ -1,9 +1,11 @@
 import { gcm } from '@noble/ciphers/aes';
-import { bytesToNumberBE, bytesToUtf8 } from '@noble/ciphers/utils';
+import { bytesToNumberBE } from '@noble/ciphers/utils';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { hkdf } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha256';
-import { randomBytes, utf8ToBytes } from '@noble/hashes/utils';
+import { randomBytes } from '@noble/hashes/utils';
+
+import type { KeyPair } from './ToprfClient';
 
 export class EncryptorDecryptor {
   readonly #HKDF_ENCRYPTION_KEY_INFO = 'encryption-key';
@@ -12,33 +14,29 @@ export class EncryptorDecryptor {
 
   readonly #nonceSize = 24;
 
-  encrypt(key: string, data: string): string {
+  encrypt(key: Uint8Array, data: Uint8Array): string {
     const nonce = randomBytes(24);
-    const rawKey = new Uint8Array(Buffer.from(key, 'base64'));
-    const aes = gcm(rawKey, nonce);
+    const aes = gcm(key, nonce);
 
-    const rawData = utf8ToBytes(data);
-    const cipherText = aes.encrypt(rawData);
+    const cipherText = aes.encrypt(data);
     const encryptedData = Buffer.concat([nonce, cipherText]);
     return encryptedData.toString('base64');
   }
 
-  decrypt(key: string, cipherTextCombinedWithNonceString: string): string {
-    const rawKey = new Uint8Array(Buffer.from(key, 'base64'));
-    const cipherTextCombinedWithNonce = new Uint8Array(
-      Buffer.from(cipherTextCombinedWithNonceString, 'base64'),
-    );
-
+  decrypt(
+    key: Uint8Array,
+    cipherTextCombinedWithNonce: Uint8Array,
+  ): Uint8Array {
     const nonce = cipherTextCombinedWithNonce.slice(0, this.#nonceSize);
     const rawEncData = cipherTextCombinedWithNonce.slice(this.#nonceSize);
 
-    const aes = gcm(rawKey, nonce);
+    const aes = gcm(key, nonce);
     const rawData = aes.decrypt(rawEncData);
 
-    return bytesToUtf8(rawData);
+    return rawData;
   }
 
-  keyFromPassword(password: string): string {
+  keyFromPassword(password: string): Uint8Array {
     const seed = sha256(password);
     const key = hkdf(
       sha256,
@@ -47,10 +45,10 @@ export class EncryptorDecryptor {
       this.#HKDF_ENCRYPTION_KEY_INFO,
       32,
     );
-    return Buffer.from(key).toString('base64');
+    return key;
   }
 
-  authKeyPairFromPassword(password: string): { sk: bigint; pk: Uint8Array } {
+  authKeyPairFromPassword(password: string): KeyPair {
     const seed = sha256(password);
     const k = hkdf(sha256, seed, undefined, this.#HKDF_AUTH_KEY_INFO, 32); // Derive 256 bit key.
 

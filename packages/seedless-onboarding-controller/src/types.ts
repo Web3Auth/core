@@ -30,10 +30,11 @@ export type CreateSeedlessBackupParams = {
   seedPhrase: string;
 };
 
-export type RestoreSeedlessBackupParams = {
-  nodeAuthTokens: NodeAuthTokens;
-  password: string;
-  seedPhrase: string;
+export type UpdatePasswordParams = {
+  verifier: OAuthVerifier;
+  verifierID: string;
+  newPassword: string;
+  oldPassword: string;
 };
 
 /**
