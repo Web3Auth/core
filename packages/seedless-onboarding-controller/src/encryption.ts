@@ -1,11 +1,14 @@
 import { gcm } from '@noble/ciphers/aes';
-import { bytesToUtf8 } from '@noble/ciphers/utils';
+import { bytesToNumberBE, bytesToUtf8 } from '@noble/ciphers/utils';
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { hkdf } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha256';
 import { randomBytes, utf8ToBytes } from '@noble/hashes/utils';
 
 export class EncryptorDecryptor {
   readonly #HKDF_ENCRYPTION_KEY_INFO = 'encryption-key';
+
+  readonly #HKDF_AUTH_KEY_INFO = 'authentication-key';
 
   readonly #nonceSize = 24;
 
@@ -45,5 +48,16 @@ export class EncryptorDecryptor {
       32,
     );
     return Buffer.from(key).toString('base64');
+  }
+
+  authKeyPairFromPassword(password: string): { sk: bigint; pk: Uint8Array } {
+    const seed = sha256(password);
+    const k = hkdf(sha256, seed, undefined, this.#HKDF_AUTH_KEY_INFO, 32); // Derive 256 bit key.
+
+    // Converting from bytes to scalar like this is OK because statistical
+    // distance between U(2^256) % secp256k1.n and U(secp256k1.n) is negligible.
+    const sk = bytesToNumberBE(k) % secp256k1.CURVE.n;
+    const pk = secp256k1.getPublicKey(sk, false);
+    return { sk, pk };
   }
 }
