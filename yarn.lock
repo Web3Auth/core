@@ -2522,9 +2522,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@metamask/auth-network-utils@file:../auth-network-utils::locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D15ffa6%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller":
+"@metamask/auth-network-utils@file:../auth-network-utils::locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D4dd9b6%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller":
   version: 0.0.0
-  resolution: "@metamask/auth-network-utils@file:../auth-network-utils#../auth-network-utils::hash=f87a3a&locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D15ffa6%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller"
+  resolution: "@metamask/auth-network-utils@file:../auth-network-utils#../auth-network-utils::hash=f87a3a&locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D4dd9b6%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller"
   dependencies:
     "@noble/curves": "npm:^1.2.0"
     "@noble/hashes": "npm:^1.4.0"
@@ -4291,19 +4291,19 @@ __metadata:
 
 "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup::locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller":
   version: 0.0.0
-  resolution: "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup#../../../toprf-sdk/packages/toprf-secure-backup::hash=15ffa6&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
+  resolution: "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup#../../../toprf-sdk/packages/toprf-secure-backup::hash=4dd9b6&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
   dependencies:
     "@metamask/auth-network-utils": ../auth-network-utils
-    "@noble/ciphers": "npm:^1.2.1"
-    "@noble/curves": "npm:^1.7.0"
-    "@noble/hashes": "npm:^1.7.0"
+    "@noble/ciphers": "npm:^0.5.2"
+    "@noble/curves": "npm:^1.2.0"
+    "@noble/hashes": "npm:^1.4.0"
     "@sentry/core": "npm:^9.10.0"
     "@toruslabs/constants": "npm:^15.0.0"
     "@toruslabs/eccrypto": "npm:^6.0.2"
     "@toruslabs/fetch-node-details": "npm:^15.0.0"
     "@toruslabs/http-helpers": "npm:^8.1.1"
     bn.js: "npm:^5.2.1"
-  checksum: 10/fcb4a305c254e088a083cfa037974423bdccfe2fd449fd4e8e4db65412d4a1838ca0107c39a355352f84c6e2fc34d24ccc1d498d2e2ae31706074958828b3ad2
+  checksum: 10/2081ef2013b4fdf5402abd8d7899627e5e249c59fbc91219dd125af74deb34192d6dc84e4f46227747d0b14ba41b40f5d72498a064bc099c557c9902dec3ac3f
   languageName: node
   linkType: hard
 
@@ -4475,13 +4475,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/ciphers@npm:^1.2.1":
-  version: 1.2.1
-  resolution: "@noble/ciphers@npm:1.2.1"
-  checksum: 10/7fa0d32529d8da6323b08afec97218f6d6bc0d1e135243bf10f7587a2819495c3f3f4a5af1f41045501bb1ade94238c76960366a5d6441970e49ba9cacb88740
-  languageName: node
-  linkType: hard
-
 "@noble/curves@npm:1.2.0":
   version: 1.2.0
   resolution: "@noble/curves@npm:1.2.0"
@@ -4509,15 +4502,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:^1.7.0":
-  version: 1.8.1
-  resolution: "@noble/curves@npm:1.8.1"
-  dependencies:
-    "@noble/hashes": "npm:1.7.1"
-  checksum: 10/e861db372cc0734b02a4c61c0f5a6688d4a7555edca3d8a9e7c846c9aa103ca52d3c3818e8bc333a1a95b5be7f370ff344668d5d759471b11c2d14c7f24b3984
-  languageName: node
-  linkType: hard
-
 "@noble/hashes@npm:1.3.2":
   version: 1.3.2
   resolution: "@noble/hashes@npm:1.3.2"
@@ -4529,13 +4513,6 @@ __metadata:
   version: 1.4.0
   resolution: "@noble/hashes@npm:1.4.0"
   checksum: 10/e156e65794c473794c52fa9d06baf1eb20903d0d96719530f523cc4450f6c721a957c544796e6efd0197b2296e7cd70efeb312f861465e17940a3e3c7e0febc6
-  languageName: node
-  linkType: hard
-
-"@noble/hashes@npm:1.7.1, @noble/hashes@npm:^1.7.0":
-  version: 1.7.1
-  resolution: "@noble/hashes@npm:1.7.1"
-  checksum: 10/ca3120da0c3e7881d6a481e9667465cc9ebbee1329124fb0de442e56d63fef9870f8cc96f264ebdb18096e0e36cebc0e6e979a872d545deb0a6fed9353f17e05
   languageName: node
   linkType: hard
 

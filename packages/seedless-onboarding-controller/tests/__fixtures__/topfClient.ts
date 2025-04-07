@@ -1,67 +1,64 @@
 import nock from 'nock';
 
 import {
-  MOCK_AUTH_GET_RESPONSE,
-  MOCK_AUTH_GET_URL,
-  MOCK_AUTH_SET_RESPONSE,
-  MOCK_AUTH_SET_URL,
-  MOCK_METADATA_GET_RESPONSE,
-  MOCK_METADATA_GET_URL,
-  MOCK_METADATA_SET_RESPONSE,
-  MOCK_METADATA_SET_URL,
-} from '../mocks/metadataStore';
+  MOCK_SECRET_DATA_ADD_RESPONSE,
+  MOCK_SECRET_DATA_GET_RESPONSE,
+  MOCK_TOPRF_AUTHENTICATION_RESPONSE,
+  MOCK_TOPRF_COMMITMENT_RESPONSE,
+  TOPRF_BASE_URL,
+} from '../mocks/toprf';
 
 type MockReply = {
   status: nock.StatusCode;
   body?: nock.Body;
 };
 
-export const handleMockAuthSet = (mockReply?: MockReply) => {
+export const handleMockCommitment = (mockReply?: MockReply) => {
   const reply = mockReply ?? {
     status: 200,
-    body: MOCK_AUTH_SET_RESPONSE,
+    body: MOCK_TOPRF_COMMITMENT_RESPONSE,
   };
-  const mockEndpoint = nock(MOCK_AUTH_SET_URL)
+
+  const mockEndpoint = nock(TOPRF_BASE_URL)
     .persist()
-    .post('')
+    .post('/sss/jrpc')
     .reply(reply.status, reply.body);
 
   return mockEndpoint;
 };
 
-export const handleMockAuthGet = (mockReply?: MockReply) => {
+export const handleMockAuthenticate = (mockReply?: MockReply) => {
   const reply = mockReply ?? {
     status: 200,
-    body: MOCK_AUTH_GET_RESPONSE,
+    body: MOCK_TOPRF_AUTHENTICATION_RESPONSE,
   };
-
-  const mockEndpoint = nock(MOCK_AUTH_GET_URL)
+  const mockEndpoint = nock(TOPRF_BASE_URL)
     .persist()
-    .post('')
+    .post('/sss/jrpc')
     .reply(reply.status, reply.body);
 
   return mockEndpoint;
 };
 
-export const handleMockMetadataSet = (mockReply?: MockReply) => {
+export const handleMockSecretDataAdd = (mockReply?: MockReply) => {
   const reply = mockReply ?? {
     status: 200,
-    body: MOCK_METADATA_SET_RESPONSE,
+    body: MOCK_SECRET_DATA_ADD_RESPONSE,
   };
-  const mockEndpoint = nock(MOCK_METADATA_SET_URL)
-    .post('')
+  const mockEndpoint = nock(TOPRF_BASE_URL)
+    .post('/metadata/enc_account_data/set')
     .reply(reply.status, reply.body);
 
   return mockEndpoint;
 };
 
-export const handleMockMetadataGet = (mockReply?: MockReply) => {
+export const handleMockSecretDataGet = (mockReply?: MockReply) => {
   const reply = mockReply ?? {
     status: 200,
-    body: MOCK_METADATA_GET_RESPONSE,
+    body: MOCK_SECRET_DATA_GET_RESPONSE,
   };
-  const mockEndpoint = nock(MOCK_METADATA_GET_URL)
-    .post('')
+  const mockEndpoint = nock(TOPRF_BASE_URL)
+    .post('/metadata/enc_account_data/get')
     .reply(reply.status, reply.body);
 
   return mockEndpoint;
