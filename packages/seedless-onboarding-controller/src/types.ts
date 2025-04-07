@@ -2,30 +2,9 @@ import type { Json } from '@metamask/utils';
 
 export type OAuthVerifier = 'google' | 'apple';
 
-export type AuthenticateUserParams = {
-  idTokens: string[];
-  verifier: OAuthVerifier;
-  verifierID: string;
-  indexes: number[];
-  endpoints: string[];
-};
-
-export type NodeAuthToken = {
-  /**
-   * The token issued by the node on verifying the idToken
-   */
-  nodeAuthToken: string;
-  /**
-   * The index of the node that issued the token
-   */
-  nodeIndex: number;
-};
-
-export type NodeAuthTokens = NodeAuthToken[];
-
 export type CreateSeedlessBackupParams = {
   verifier: OAuthVerifier;
-  verifierID: string;
+  verifierId: string;
   password: string;
   seedPhrase: string;
 };

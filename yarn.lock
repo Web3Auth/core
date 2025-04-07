@@ -2522,9 +2522,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@metamask/auth-network-utils@file:../auth-network-utils::locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D3e7777%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller":
+"@metamask/auth-network-utils@file:../auth-network-utils::locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D4b1149%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller":
   version: 0.0.0
-  resolution: "@metamask/auth-network-utils@file:../auth-network-utils#../auth-network-utils::hash=6efa02&locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D3e7777%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller"
+  resolution: "@metamask/auth-network-utils@file:../auth-network-utils#../auth-network-utils::hash=f87a3a&locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D4b1149%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller"
   dependencies:
     "@noble/curves": "npm:^1.2.0"
     "@noble/hashes": "npm:^1.4.0"
@@ -2533,9 +2533,9 @@ __metadata:
     "@toruslabs/eccrypto": "npm:^6.0.2"
     bn.js: "npm:^5.2.1"
     elliptic: "npm:^6.6.1"
-    json-stable-stringify: "npm:^1.1.1"
-    loglevel: "npm:1.9.1"
-  checksum: 10/f7e7dc0230defe6e93005757a0eb61880a23756a1a20c0382face259a67aa79bf0a0ee97018768d18c54d437c34cfbb0cc858cee02f4c3b2899e959a922c8968
+    json-stable-stringify: "npm:^1.2.1"
+    loglevel: "npm:^1.9.2"
+  checksum: 10/aa086b7a9b82915b81c91581a7c28b67f31c043ac9876728dd02f2e45200d645c84e38d6393e5866d011d8887ccd4e4336b6f4b86481d358827365f7bbb3ebe8
   languageName: node
   linkType: hard
 
@@ -4291,7 +4291,7 @@ __metadata:
 
 "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup::locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller":
   version: 0.0.0
-  resolution: "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup#../../../toprf-sdk/packages/toprf-secure-backup::hash=3e7777&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
+  resolution: "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup#../../../toprf-sdk/packages/toprf-secure-backup::hash=4b1149&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
   dependencies:
     "@metamask/auth-network-utils": ../auth-network-utils
     "@noble/ciphers": "npm:^0.5.2"
@@ -4303,7 +4303,7 @@ __metadata:
     "@toruslabs/fetch-node-details": "npm:^15.0.0"
     "@toruslabs/http-helpers": "npm:^8.1.1"
     bn.js: "npm:^5.2.1"
-  checksum: 10/d52559908590f36efb1743b47a0b842e593650f632e15dacdf24f75494dfb6e426710d5284b2151e200615d04d2921b675041b33334666559442cfad2d7c95cf
+  checksum: 10/0c802691210393f7ea01f34157676373c3e30148db4c7f8b8e805e9c6fee4763f7f5ab63164c480fc9ef4700c83533256891cee0d71b0e8b7a87b16359726d62
   languageName: node
   linkType: hard
 
@@ -11012,7 +11012,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"json-stable-stringify@npm:^1.1.1":
+"json-stable-stringify@npm:^1.2.1":
   version: 1.2.1
   resolution: "json-stable-stringify@npm:1.2.1"
   dependencies:
@@ -11208,7 +11208,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loglevel@npm:1.9.1, loglevel@npm:^1.8.1":
+"loglevel@npm:^1.8.1":
   version: 1.9.1
   resolution: "loglevel@npm:1.9.1"
   checksum: 10/863cbbcddf850a937482c604e2d11586574a5110b746bb49c7cc04739e01f6035f6db841d25377106dd330bca7142d74995f15a97c5f3ea0af86d9472d4a99f4
