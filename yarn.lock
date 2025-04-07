@@ -2522,6 +2522,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@metamask/auth-network-utils@file:../auth-network-utils::locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D3e7777%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller":
+  version: 0.0.0
+  resolution: "@metamask/auth-network-utils@file:../auth-network-utils#../auth-network-utils::hash=6efa02&locator=%40metamask%2Ftoprf-secure-backup%40file%3A..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%23..%2F..%2F..%2Ftoprf-sdk%2Fpackages%2Ftoprf-secure-backup%3A%3Ahash%3D3e7777%26locator%3D%2540metamask%252Fseedless-onboarding-controller%2540workspace%253Apackages%252Fseedless-onboarding-controller"
+  dependencies:
+    "@noble/curves": "npm:^1.2.0"
+    "@noble/hashes": "npm:^1.4.0"
+    "@toruslabs/bs58": "npm:^1.0.0"
+    "@toruslabs/constants": "npm:^15.0.0"
+    "@toruslabs/eccrypto": "npm:^6.0.2"
+    bn.js: "npm:^5.2.1"
+    elliptic: "npm:^6.6.1"
+    json-stable-stringify: "npm:^1.1.1"
+    loglevel: "npm:1.9.1"
+  checksum: 10/f7e7dc0230defe6e93005757a0eb61880a23756a1a20c0382face259a67aa79bf0a0ee97018768d18c54d437c34cfbb0cc858cee02f4c3b2899e959a922c8968
+  languageName: node
+  linkType: hard
+
 "@metamask/auto-changelog@npm:^3.4.4":
   version: 3.4.4
   resolution: "@metamask/auto-changelog@npm:3.4.4"
@@ -4033,6 +4050,7 @@ __metadata:
     "@metamask/base-controller": "npm:^8.0.0"
     "@metamask/browser-passworder": "npm:^4.3.0"
     "@metamask/keyring-controller": "npm:^21.0.0"
+    "@metamask/toprf-secure-backup": ../../../toprf-sdk/packages/toprf-secure-backup
     "@metamask/utils": "npm:^11.2.0"
     "@noble/ciphers": "npm:^0.5.2"
     "@noble/curves": "npm:^1.2.0"
@@ -4270,6 +4288,24 @@ __metadata:
     typescript: "npm:~5.2.2"
   languageName: unknown
   linkType: soft
+
+"@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup::locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller":
+  version: 0.0.0
+  resolution: "@metamask/toprf-secure-backup@file:../../../toprf-sdk/packages/toprf-secure-backup#../../../toprf-sdk/packages/toprf-secure-backup::hash=3e7777&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
+  dependencies:
+    "@metamask/auth-network-utils": ../auth-network-utils
+    "@noble/ciphers": "npm:^0.5.2"
+    "@noble/curves": "npm:^1.2.0"
+    "@noble/hashes": "npm:^1.4.0"
+    "@sentry/core": "npm:^9.10.0"
+    "@toruslabs/constants": "npm:^15.0.0"
+    "@toruslabs/eccrypto": "npm:^6.0.2"
+    "@toruslabs/fetch-node-details": "npm:^15.0.0"
+    "@toruslabs/http-helpers": "npm:^8.1.1"
+    bn.js: "npm:^5.2.1"
+  checksum: 10/d52559908590f36efb1743b47a0b842e593650f632e15dacdf24f75494dfb6e426710d5284b2151e200615d04d2921b675041b33334666559442cfad2d7c95cf
+  languageName: node
+  linkType: hard
 
 "@metamask/transaction-controller@npm:^48.0.0, @metamask/transaction-controller@workspace:packages/transaction-controller":
   version: 0.0.0-use.local
@@ -4745,6 +4781,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sentry/core@npm:^9.10.0":
+  version: 9.11.0
+  resolution: "@sentry/core@npm:9.11.0"
+  checksum: 10/f0304b1f4e736e7778ee290240f0c0f2d68bb521cf550b9b8b5fcc23038abf0f6679575b469ece77884c7eb2f27226d58a26b8dcfea6318cb885d522bd2a5ac5
+  languageName: node
+  linkType: hard
+
 "@sinclair/typebox@npm:^0.27.8":
   version: 0.27.8
   resolution: "@sinclair/typebox@npm:0.27.8"
@@ -4950,6 +4993,74 @@ __metadata:
   version: 1.1.2
   resolution: "@tootallnate/once@npm:1.1.2"
   checksum: 10/e1fb1bbbc12089a0cb9433dc290f97bddd062deadb6178ce9bcb93bb7c1aecde5e60184bc7065aec42fe1663622a213493c48bbd4972d931aae48315f18e1be9
+  languageName: node
+  linkType: hard
+
+"@toruslabs/bs58@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@toruslabs/bs58@npm:1.0.0"
+  peerDependencies:
+    "@babel/runtime": 7.x
+  checksum: 10/cb2db1560671ce7e87d5fb4dd2d8e2dcff38b01162fef14c9579cb6262366cbdb895f2b6a58e0e48ccb5c39ee3d0cd971c8fb29a37cf0dd6fa5c68d53314291b
+  languageName: node
+  linkType: hard
+
+"@toruslabs/constants@npm:^15.0.0":
+  version: 15.0.0
+  resolution: "@toruslabs/constants@npm:15.0.0"
+  peerDependencies:
+    "@babel/runtime": 7.x
+  checksum: 10/82c8ecfe0ada4b0efa5972f4816befa6d732345a808ce905eec2267a35811ec80361132f56ad3244a43909a67e6c7f99c3885cb4a0a53f75408fc7ba063cbe5d
+  languageName: node
+  linkType: hard
+
+"@toruslabs/eccrypto@npm:^6.0.2":
+  version: 6.0.2
+  resolution: "@toruslabs/eccrypto@npm:6.0.2"
+  dependencies:
+    elliptic: "npm:^6.6.1"
+  checksum: 10/a9444da5a65186b3b361095df2fbfd66aa09ffe5723610c71636165e2798942cfc74d89a5bf63507aacf2518baee453bcf04ff353c5e2978a32c29db276a2c41
+  languageName: node
+  linkType: hard
+
+"@toruslabs/fetch-node-details@npm:^15.0.0":
+  version: 15.0.0
+  resolution: "@toruslabs/fetch-node-details@npm:15.0.0"
+  dependencies:
+    "@toruslabs/constants": "npm:^15.0.0"
+    "@toruslabs/fnd-base": "npm:^15.0.0"
+    "@toruslabs/http-helpers": "npm:^8.1.1"
+    loglevel: "npm:^1.9.2"
+  peerDependencies:
+    "@babel/runtime": 7.x
+  checksum: 10/16411ff7dc3be045784deb9c69e316bda03355c9ca3db4912677c051a1d4ebcb1e8b6116f5cfe0793dce3bd80281cc7ca2c5b02479f86621e628b4c3ca4f2d7b
+  languageName: node
+  linkType: hard
+
+"@toruslabs/fnd-base@npm:^15.0.0":
+  version: 15.0.0
+  resolution: "@toruslabs/fnd-base@npm:15.0.0"
+  dependencies:
+    "@toruslabs/constants": "npm:^15.0.0"
+  peerDependencies:
+    "@babel/runtime": 7.x
+  checksum: 10/1f4998b8b8a1311978551dc21c761b9baa3d928254be6a3fc350400c48fccc15b9cc787cf2660594e8662fffe1385aaf3b6fa7580eea525782ab27b87c94733c
+  languageName: node
+  linkType: hard
+
+"@toruslabs/http-helpers@npm:^8.1.1":
+  version: 8.1.1
+  resolution: "@toruslabs/http-helpers@npm:8.1.1"
+  dependencies:
+    deepmerge: "npm:^4.3.1"
+    loglevel: "npm:^1.9.2"
+  peerDependencies:
+    "@babel/runtime": ^7.x
+    "@sentry/core": ^9.x
+  peerDependenciesMeta:
+    "@sentry/core":
+      optional: true
+  checksum: 10/bae7821b8a30a40dff4752bb41bb93d0fa6d41e766e3cdb998462bb59338e3fa8b2a491ccc97cbe371b25d155b2bea8e69ecbd4b177cb42af6aba9b34af7aba8
   languageName: node
   linkType: hard
 
@@ -7011,6 +7122,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"call-bind-apply-helpers@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "call-bind-apply-helpers@npm:1.0.2"
+  dependencies:
+    es-errors: "npm:^1.3.0"
+    function-bind: "npm:^1.1.2"
+  checksum: 10/00482c1f6aa7cfb30fb1dbeb13873edf81cfac7c29ed67a5957d60635a56b2a4a480f1016ddbdb3395cc37900d46037fb965043a51c5c789ffeab4fc535d18b5
+  languageName: node
+  linkType: hard
+
 "call-bind@npm:^1.0.0, call-bind@npm:^1.0.2, call-bind@npm:^1.0.5, call-bind@npm:^1.0.7":
   version: 1.0.7
   resolution: "call-bind@npm:1.0.7"
@@ -7021,6 +7142,16 @@ __metadata:
     get-intrinsic: "npm:^1.2.4"
     set-function-length: "npm:^1.2.1"
   checksum: 10/cd6fe658e007af80985da5185bff7b55e12ef4c2b6f41829a26ed1eef254b1f1c12e3dfd5b2b068c6ba8b86aba62390842d81752e67dcbaec4f6f76e7113b6b7
+  languageName: node
+  linkType: hard
+
+"call-bound@npm:^1.0.3":
+  version: 1.0.4
+  resolution: "call-bound@npm:1.0.4"
+  dependencies:
+    call-bind-apply-helpers: "npm:^1.0.2"
+    get-intrinsic: "npm:^1.3.0"
+  checksum: 10/ef2b96e126ec0e58a7ff694db43f4d0d44f80e641370c21549ed911fecbdbc2df3ebc9bddad918d6bbdefeafb60bb3337902006d5176d72bcd2da74820991af7
   languageName: node
   linkType: hard
 
@@ -7631,7 +7762,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"deepmerge@npm:^4.2.2":
+"deepmerge@npm:^4.2.2, deepmerge@npm:^4.3.1":
   version: 4.3.1
   resolution: "deepmerge@npm:4.3.1"
   checksum: 10/058d9e1b0ff1a154468bf3837aea436abcfea1ba1d165ddaaf48ca93765fdd01a30d33c36173da8fbbed951dd0a267602bc782fe288b0fc4b7e1e7091afc4529
@@ -7877,7 +8008,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"elliptic@npm:^6.5.7":
+"elliptic@npm:^6.5.7, elliptic@npm:^6.6.1":
   version: 6.6.1
   resolution: "elliptic@npm:6.6.1"
   dependencies:
@@ -9967,6 +10098,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"isarray@npm:^2.0.5":
+  version: 2.0.5
+  resolution: "isarray@npm:2.0.5"
+  checksum: 10/1d8bc7911e13bb9f105b1b3e0b396c787a9e63046af0b8fe0ab1414488ab06b2b099b87a2d8a9e31d21c9a6fad773c7fc8b257c4880f2d957274479d28ca3414
+  languageName: node
+  linkType: hard
+
 "isexe@npm:^2.0.0":
   version: 2.0.0
   resolution: "isexe@npm:2.0.0"
@@ -10874,6 +11012,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"json-stable-stringify@npm:^1.1.1":
+  version: 1.2.1
+  resolution: "json-stable-stringify@npm:1.2.1"
+  dependencies:
+    call-bind: "npm:^1.0.8"
+    call-bound: "npm:^1.0.3"
+    isarray: "npm:^2.0.5"
+    jsonify: "npm:^0.0.1"
+    object-keys: "npm:^1.1.1"
+  checksum: 10/f4600d34605e1da81a615ddf7dc62f021a5a5c822aee38b3c878e9a703bbd72623402944dbd7848140602c9ec54bfa2df65dfe75cc40afcfd79f3f072ca5307b
+  languageName: node
+  linkType: hard
+
 "json-stringify-safe@npm:^5.0.1":
   version: 5.0.1
   resolution: "json-stringify-safe@npm:5.0.1"
@@ -10907,6 +11058,13 @@ __metadata:
     graceful-fs:
       optional: true
   checksum: 10/03014769e7dc77d4cf05fa0b534907270b60890085dd5e4d60a382ff09328580651da0b8b4cdf44d91e4c8ae64d91791d965f05707beff000ed494a38b6fec85
+  languageName: node
+  linkType: hard
+
+"jsonify@npm:^0.0.1":
+  version: 0.0.1
+  resolution: "jsonify@npm:0.0.1"
+  checksum: 10/7b86b6f4518582ff1d8b7624ed6c6277affd5246445e864615dbdef843a4057ac58587684faf129ea111eeb80e01c15f0a4d9d03820eb3f3985fa67e81b12398
   languageName: node
   linkType: hard
 
@@ -11050,7 +11208,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loglevel@npm:^1.8.1":
+"loglevel@npm:1.9.1, loglevel@npm:^1.8.1":
   version: 1.9.1
   resolution: "loglevel@npm:1.9.1"
   checksum: 10/863cbbcddf850a937482c604e2d11586574a5110b746bb49c7cc04739e01f6035f6db841d25377106dd330bca7142d74995f15a97c5f3ea0af86d9472d4a99f4
