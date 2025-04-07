@@ -143,7 +143,7 @@ describe('SeedlessOnboardingController', () => {
       });
       expect(controller).toBeDefined();
       expect(controller.state).toStrictEqual({
-        hasValidEncryptionKey: false,
+        isNewUser: true,
       });
     });
 
@@ -166,7 +166,7 @@ describe('SeedlessOnboardingController', () => {
       await withController(async ({ controller, toprfClient }) => {
         jest.spyOn(toprfClient, 'authenticate').mockResolvedValue({
           nodeAuthTokens: MOCK_NODE_AUTH_TOKENS,
-          hasValidEncKey: false,
+          isNewUser: false,
         });
 
         const authResult = await controller.authenticate({
@@ -177,7 +177,7 @@ describe('SeedlessOnboardingController', () => {
 
         expect(authResult).toBeDefined();
         expect(authResult.nodeAuthTokens).toBeDefined();
-        expect(authResult.hasValidEncKey).toBe(false);
+        expect(authResult.isNewUser).toBe(false);
 
         expect(controller.state.nodeAuthTokens).toBeDefined();
         expect(controller.state.nodeAuthTokens).toStrictEqual(
@@ -190,7 +190,7 @@ describe('SeedlessOnboardingController', () => {
       await withController(async ({ controller, toprfClient }) => {
         jest.spyOn(toprfClient, 'authenticate').mockResolvedValue({
           nodeAuthTokens: MOCK_NODE_AUTH_TOKENS,
-          hasValidEncKey: true,
+          isNewUser: true,
         });
 
         const authResult = await controller.authenticate({
@@ -201,7 +201,7 @@ describe('SeedlessOnboardingController', () => {
 
         expect(authResult).toBeDefined();
         expect(authResult.nodeAuthTokens).toBeDefined();
-        expect(authResult.hasValidEncKey).toBe(true);
+        expect(authResult.isNewUser).toBe(true);
 
         expect(controller.state.nodeAuthTokens).toBeDefined();
         expect(controller.state.nodeAuthTokens).toStrictEqual(

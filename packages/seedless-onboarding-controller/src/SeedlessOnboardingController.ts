@@ -56,10 +56,10 @@ export type SeedlessOnboardingControllerState = {
    * An encryption key is generated from user entered password using Threshold OPRF and the seed phrase is encrypted with the key.
    * During the Seedless Onboarding Authentication step, TOPRF services check whether user has already generated the encryption key.
    *
-   * If this value is `true`, we can assume that user already has completed the `SeedPhrase` generation step, and user will have to
+   * If this value is `false`, we can assume that user already has completed the `SeedPhrase` generation step, and user will have to
    * fetch the `SeedPhrase` with correct password. Otherwise, users will be asked to set up seedphrase and password, first.
    */
-  hasValidEncryptionKey?: boolean;
+  isNewUser?: boolean;
 };
 
 // Actions
@@ -122,7 +122,7 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       persist: true,
       anonymous: false,
     },
-    hasValidEncryptionKey: {
+    isNewUser: {
       persist: true,
       anonymous: false,
     },
@@ -133,7 +133,7 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
   };
 
 export const defaultState: SeedlessOnboardingControllerState = {
-  hasValidEncryptionKey: false,
+  isNewUser: true,
 };
 
 export class SeedlessOnboardingController extends BaseController<
@@ -185,7 +185,7 @@ export class SeedlessOnboardingController extends BaseController<
       const authenticationResult = await this.toprfClient.authenticate(params);
       this.update((state) => {
         state.nodeAuthTokens = authenticationResult.nodeAuthTokens;
-        state.hasValidEncryptionKey = authenticationResult.hasValidEncKey;
+        state.isNewUser = authenticationResult.isNewUser;
       });
       return authenticationResult;
     } catch (error) {
