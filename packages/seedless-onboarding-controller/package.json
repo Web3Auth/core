@@ -52,6 +52,7 @@
     "@metamask/keyring-controller": "^21.0.0",
     "@metamask/utils": "^11.2.0",
     "@noble/ciphers": "^0.5.2",
+    "@noble/curves": "^1.2.0",
     "@noble/hashes": "^1.4.0",
     "async-mutex": "^0.5.0"
   },
@@ -61,6 +62,7 @@
     "deepmerge": "^4.2.2",
     "jest": "^27.5.1",
     "jest-environment-node": "^27.5.1",
+    "nock": "^13.3.1",
     "ts-jest": "^27.1.4",
     "typedoc": "^0.24.8",
     "typedoc-plugin-missing-exports": "^2.0.0",

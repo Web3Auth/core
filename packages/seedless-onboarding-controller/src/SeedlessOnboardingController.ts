@@ -7,9 +7,11 @@ import type {
 import { BaseController } from '@metamask/base-controller';
 import { encrypt, decrypt } from '@metamask/browser-passworder';
 import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
+import { utf8ToBytes } from '@noble/ciphers/utils';
 import { Mutex, type MutexInterface } from 'async-mutex';
 
 import { SeedlessOnboardingControllerError } from './constants';
+import type { KeyPair } from './ToprfClient';
 import { ToprfAuthClient } from './ToprfClient';
 import type {
   AuthenticateUserParams,
@@ -17,6 +19,7 @@ import type {
   Encryptor,
   NodeAuthTokens,
   OAuthVerifier,
+  UpdatePasswordParams,
 } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
@@ -192,34 +195,29 @@ export class SeedlessOnboardingController extends BaseController<
     verifierID,
     password,
     seedPhrase,
-  }: CreateSeedlessBackupParams): Promise<{
-    encryptedSeedPhrase: string;
-    encryptionKey: string;
-  }> {
+  }: CreateSeedlessBackupParams): Promise<void> {
     const nodeAuthTokens = this.#getNodeAuthTokens();
-    const { encKey } = await this.toprfAuthClient.createEncKey({
+    const { encKey, authKeyPair } = await this.toprfAuthClient.createEncKey({
       nodeAuthTokens,
       password,
       verifier,
       verifierID,
     });
 
-    const storeResult = await this.toprfAuthClient.storeSecretData({
+    const seedPhraseBytes = utf8ToBytes(seedPhrase);
+    await this.toprfAuthClient.addSecretDataItem({
       nodeAuthTokens,
       encKey,
-      secretData: seedPhrase,
+      secretData: seedPhraseBytes,
+      authKeyPair,
     });
 
     await this.#createNewVaultWithAuthData({
       password,
       authTokens: nodeAuthTokens,
-      toprfEncryptionKey: storeResult.encKey,
+      rawToprfEncryptionKey: encKey,
+      rawToprfAuthKeyPair: authKeyPair,
     });
-
-    return {
-      encryptedSeedPhrase: storeResult.encryptedSecretData,
-      encryptionKey: storeResult.encKey,
-    };
   }
 
   /**
@@ -233,36 +231,67 @@ export class SeedlessOnboardingController extends BaseController<
     verifier: OAuthVerifier,
     verifierID: string,
     password: string,
-  ) {
-    try {
-      const nodeAuthTokens = this.#getNodeAuthTokens();
-      const { encKey } = await this.toprfAuthClient.createEncKey({
-        nodeAuthTokens,
+  ): Promise<Uint8Array[]> {
+    const nodeAuthTokens = this.#getNodeAuthTokens();
+    const { encKey, authKeyPair } = await this.toprfAuthClient.createEncKey({
+      nodeAuthTokens,
+      password,
+      verifier,
+      verifierID,
+    });
+    const secretData = await this.toprfAuthClient.fetchSecretData({
+      nodeAuthTokens,
+      decKey: encKey,
+      authKeyPair,
+    });
+
+    if (secretData && secretData.length > 0) {
+      await this.#createNewVaultWithAuthData({
         password,
+        authTokens: nodeAuthTokens,
+        rawToprfEncryptionKey: encKey,
+        rawToprfAuthKeyPair: authKeyPair,
+      });
+    }
+
+    return secretData;
+  }
+
+  /**
+   * @description Update the password of the seedless onboarding flow.
+   *
+   * Changing password will also update the encryption key and metadata store with new encrypted values.
+   *
+   * @param params - The parameters for updating the password.
+   * @param params.verifierID - The deterministic identifier of the user from the login provider.
+   * @param params.verifier - The login provider of the user.
+   * @param params.newPassword - The new password to update.
+   * @param params.oldPassword - The old password to verify.
+   */
+  async updatePassword(params: UpdatePasswordParams) {
+    const { verifier, verifierID, newPassword, oldPassword } = params;
+
+    // 1. unlock the encrypted vault with old password, retrieve the ek and authTokens from the vault
+    const { nodeAuthTokens, toprfEncryptionKey, toprfAuthKeyPair } =
+      await this.#unlockVault(oldPassword);
+    // 2. call changePassword method from Toprf Client with old password, new password
+    const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
+      await this.toprfAuthClient.changeEncKey({
+        nodeAuthTokens,
         verifier,
         verifierID,
-      });
-      const { secretData } = await this.toprfAuthClient.fetchSecretData({
-        nodeAuthTokens,
-        encKey,
+        oldEncKey: toprfEncryptionKey,
+        oldAuthKeyPair: toprfAuthKeyPair,
+        password: newPassword,
       });
 
-      if (secretData && secretData.length > 0) {
-        await this.#createNewVaultWithAuthData({
-          password,
-          authTokens: nodeAuthTokens,
-          toprfEncryptionKey: encKey,
-        });
-      }
-
-      return {
-        secretData,
-        encryptionKey: encKey,
-      };
-    } catch (error) {
-      console.error('[fetchAndRestoreSeedPhraseMetadata] error', error);
-      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
-    }
+    // 3. update and encrypt the vault with new password
+    await this.#createNewVaultWithAuthData({
+      password: newPassword,
+      authTokens: nodeAuthTokens,
+      rawToprfEncryptionKey: newEncKey,
+      rawToprfAuthKeyPair: newAuthKeyPair,
+    });
   }
 
   /**
@@ -277,25 +306,53 @@ export class SeedlessOnboardingController extends BaseController<
     return nodeAuthTokens;
   }
 
+  async #unlockVault(password: string): Promise<{
+    nodeAuthTokens: NodeAuthTokens;
+    toprfEncryptionKey: Uint8Array;
+    toprfAuthKeyPair: KeyPair;
+  }> {
+    return this.#withVaultLock(async () => {
+      assertIsValidPassword(password);
+
+      const encryptedVault = this.state.vault;
+      if (!encryptedVault) {
+        throw new Error(SeedlessOnboardingControllerError.VaultError);
+      }
+
+      const decryptedVaultData = await this.#encryptor.decrypt(
+        password,
+        encryptedVault,
+      );
+
+      return this.#parseVaultData(decryptedVaultData);
+    });
+  }
+
   async #createNewVaultWithAuthData({
     password,
     authTokens,
-    toprfEncryptionKey,
+    rawToprfEncryptionKey,
+    rawToprfAuthKeyPair,
   }: {
     password: string;
     authTokens: NodeAuthTokens;
-    toprfEncryptionKey: string;
+    rawToprfEncryptionKey: Uint8Array;
+    rawToprfAuthKeyPair: KeyPair;
   }): Promise<void> {
+    const { toprfEncryptionKey, toprfAuthKeyPair } =
+      await this.#serializeKeyData(rawToprfEncryptionKey, rawToprfAuthKeyPair);
+
     await this.#updateVault({
       password,
       vaultData: {
         authTokens,
         toprfEncryptionKey,
+        toprfAuthKeyPair,
       },
     });
   }
 
-  #updateVault({
+  async #updateVault({
     password,
     vaultData,
   }: {
@@ -305,18 +362,14 @@ export class SeedlessOnboardingController extends BaseController<
     return this.#withVaultLock(async () => {
       assertIsValidPassword(password);
 
-      const serializedAuthData = await this.#getSerializedVaultData(vaultData);
+      const serializedStateData = await this.#getSerializedStateData(vaultData);
 
       const updatedState: Partial<SeedlessOnboardingControllerState> = {};
 
       updatedState.vault = await this.#encryptor.encrypt(
         password,
-        serializedAuthData,
+        serializedStateData,
       );
-
-      if (!updatedState.vault) {
-        throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
-      }
 
       this.update((state) => {
         state.vault = updatedState.vault;
@@ -343,8 +396,68 @@ export class SeedlessOnboardingController extends BaseController<
     return withLock(this.#vaultOperationMutex, callback);
   }
 
-  async #getSerializedVaultData(data: object): Promise<string> {
+  async #getSerializedStateData(data: object): Promise<string> {
     return JSON.stringify(data);
+  }
+
+  /**
+   * @description Serialize the encryption key and authentication key pair.
+   * @param encKey - The encryption key to serialize.
+   * @param authKeyPair - The authentication key pair to serialize.
+   * @returns The serialized encryption key and authentication key pair.
+   */
+  async #serializeKeyData(
+    encKey: Uint8Array,
+    authKeyPair: KeyPair,
+  ): Promise<{
+    toprfEncryptionKey: string;
+    toprfAuthKeyPair: string;
+  }> {
+    const b64EncodedEncKey = Buffer.from(encKey).toString('base64');
+    const b64EncodedAuthKeyPair = JSON.stringify({
+      sk: authKeyPair.sk.toString(),
+      pk: Buffer.from(authKeyPair.pk).toString('base64'),
+    });
+
+    return {
+      toprfEncryptionKey: b64EncodedEncKey,
+      toprfAuthKeyPair: b64EncodedAuthKeyPair,
+    };
+  }
+
+  async #parseVaultData(data: unknown): Promise<{
+    nodeAuthTokens: NodeAuthTokens;
+    toprfEncryptionKey: Uint8Array;
+    toprfAuthKeyPair: KeyPair;
+  }> {
+    if (typeof data !== 'string') {
+      throw new Error(SeedlessOnboardingControllerError.VaultDataError);
+    }
+
+    const parsedVaultData = JSON.parse(data);
+
+    if (
+      !('authTokens' in parsedVaultData) ||
+      !('toprfEncryptionKey' in parsedVaultData) ||
+      !('toprfAuthKeyPair' in parsedVaultData)
+    ) {
+      throw new Error(SeedlessOnboardingControllerError.VaultDataError);
+    }
+
+    const rawToprfEncryptionKey = new Uint8Array(
+      Buffer.from(parsedVaultData.toprfEncryptionKey, 'base64'),
+    );
+    const parsedToprfAuthKeyPair = JSON.parse(parsedVaultData.toprfAuthKeyPair);
+    const rawToprfAuthKeyPair = {
+      sk: BigInt(parsedToprfAuthKeyPair.sk),
+      pk: new Uint8Array(Buffer.from(parsedToprfAuthKeyPair.pk, 'base64')),
+    };
+
+    return {
+      nodeAuthTokens: parsedVaultData.authTokens,
+      toprfEncryptionKey: rawToprfEncryptionKey,
+      toprfAuthKeyPair: rawToprfAuthKeyPair,
+    };
   }
 }
 
