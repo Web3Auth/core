@@ -7,20 +7,12 @@ import type {
 import { BaseController } from '@metamask/base-controller';
 import { encrypt, decrypt } from '@metamask/browser-passworder';
 import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
-import { utf8ToBytes } from '@noble/ciphers/utils';
 import { Mutex, type MutexInterface } from 'async-mutex';
 
 import { SeedlessOnboardingControllerError } from './constants';
 import type { KeyPair } from './ToprfClient';
 import { ToprfAuthClient } from './ToprfClient';
-import type {
-  AuthenticateUserParams,
-  CreateSeedlessBackupParams,
-  Encryptor,
-  NodeAuthTokens,
-  OAuthVerifier,
-  UpdatePasswordParams,
-} from './types';
+import type { Encryptor, NodeAuthTokens, OAuthVerifier } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
 
@@ -132,6 +124,9 @@ export const defaultState: SeedlessOnboardingControllerState = {
   hasValidEncryptionKey: false,
 };
 
+/**
+ * Controller responsible for creating backup and restoring seed phrase for the user.
+ */
 export class SeedlessOnboardingController extends BaseController<
   typeof controllerName,
   SeedlessOnboardingControllerState,
@@ -146,6 +141,14 @@ export class SeedlessOnboardingController extends BaseController<
 
   readonly toprfAuthClient: ToprfAuthClient;
 
+  /**
+   * Creates a KeyringController instance.
+   *
+   * @param options - Initial options used to configure this controller
+   * @param options.encryptor - An optional object for defining encryption schemes.
+   * @param options.messenger - A restricted messenger.
+   * @param options.state - Initial state to set on this controller.
+   */
   constructor({
     messenger,
     encryptor,
@@ -167,12 +170,20 @@ export class SeedlessOnboardingController extends BaseController<
    * @description Authenticate OAuth user using the seedless onboarding flow
    * and determine if the user is already registered or not.
    * @param params - The parameters for authenticate OAuth user.
-   * @param params.idToken - The ID token from Social login
+   * @param params.idTokens - The ID tokens from Social login
    * @param params.verifier - OAuth verifier
-   * @param params.verifierId - user email or id from Social login
+   * @param params.verifierID - user email or id from Social login
+   * @param params.indexes - The indexes of the nodes to use for authentication
+   * @param params.endpoints - The endpoints to verify the idTokens
    * @returns A promise that resolves to the authentication result.
    */
-  async authenticateOAuthUser(params: AuthenticateUserParams) {
+  async authenticateOAuthUser(params: {
+    verifier: OAuthVerifier;
+    verifierID: string;
+    idTokens: string[];
+    indexes: number[];
+    endpoints: string[];
+  }) {
     const verificationResult = await this.toprfAuthClient.authenticate(params);
     this.update((state) => {
       state.nodeAuthTokens = verificationResult.nodeAuthTokens;
@@ -190,12 +201,13 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.seedPhrase - The seed phrase to backup
    * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
-  async createSeedPhraseBackup({
-    verifier,
-    verifierID,
-    password,
-    seedPhrase,
-  }: CreateSeedlessBackupParams): Promise<void> {
+  async createSeedPhraseBackup(params: {
+    verifier: OAuthVerifier;
+    verifierID: string;
+    seedPhrase: Uint8Array;
+    password: string;
+  }): Promise<void> {
+    const { verifier, verifierID, password, seedPhrase } = params;
     const nodeAuthTokens = this.#getNodeAuthTokens();
     const { encKey, authKeyPair } = await this.toprfAuthClient.createEncKey({
       nodeAuthTokens,
@@ -267,7 +279,12 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.newPassword - The new password to update.
    * @param params.oldPassword - The old password to verify.
    */
-  async updatePassword(params: UpdatePasswordParams) {
+  async updatePassword(params: {
+    verifier: OAuthVerifier;
+    verifierID: string;
+    newPassword: string;
+    oldPassword: string;
+  }) {
     const { verifier, verifierID, newPassword, oldPassword } = params;
 
     // 1. unlock the encrypted vault with old password, retrieve the ek and authTokens from the vault
@@ -327,6 +344,15 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
+  /**
+   * Create a new vault with the given password and auth data from the Toprf Client.
+   *
+   * @param params - The parameters for creating a new vault.
+   * @param params.password - The password to encrypt the vault.
+   * @param params.authTokens - The auth tokens to store in the vault.
+   * @param params.rawToprfEncryptionKey - The raw encryption key to encrypt/decrypt the Encrypted Seed Phrase.
+   * @param params.rawToprfAuthKeyPair - The raw authentication key pair to authenticate the user for storing the Encrypted Seed Phrase.
+   */
   async #createNewVaultWithAuthData({
     password,
     authTokens,
@@ -351,6 +377,14 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
+  /**
+   * Encrypt the vault with the given password and update vault data.
+   *
+   * @param params - The parameters for updating the vault.
+   * @param params.password - The password to update the vault.
+   * @param params.vaultData - The vault data to update.
+   * @returns A promise that resolves to the boolean value.
+   */
   async #updateVault({
     password,
     vaultData,
@@ -395,6 +429,12 @@ export class SeedlessOnboardingController extends BaseController<
     return withLock(this.#vaultOperationMutex, callback);
   }
 
+  /**
+   * Serialize the data to the JSON string.
+   *
+   * @param data - The state data to serialize.
+   * @returns The serialized state data.
+   */
   async #getSerializedStateData(data: object): Promise<string> {
     return JSON.stringify(data);
   }
@@ -424,6 +464,12 @@ export class SeedlessOnboardingController extends BaseController<
     };
   }
 
+  /**
+   * Parse the vault data from the serialized string
+   *
+   * @param data - The vault data to parse.
+   * @returns The parsed vault data.
+   */
   async #parseVaultData(data: unknown): Promise<{
     nodeAuthTokens: NodeAuthTokens;
     toprfEncryptionKey: Uint8Array;

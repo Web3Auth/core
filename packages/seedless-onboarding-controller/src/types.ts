@@ -2,14 +2,6 @@ import type { Json } from '@metamask/utils';
 
 export type OAuthVerifier = 'google' | 'apple';
 
-export type AuthenticateUserParams = {
-  idTokens: string[];
-  verifier: OAuthVerifier;
-  verifierID: string;
-  indexes: number[];
-  endpoints: string[];
-};
-
 export type NodeAuthToken = {
   /**
    * The token issued by the node on verifying the idToken
@@ -22,21 +14,6 @@ export type NodeAuthToken = {
 };
 
 export type NodeAuthTokens = NodeAuthToken[];
-
-export type CreateSeedlessBackupParams = {
-  verifier: OAuthVerifier;
-  verifierID: string;
-  password: string;
-  seedPhrase: Uint8Array;
-};
-
-export type UpdatePasswordParams = {
-  verifier: OAuthVerifier;
-  verifierID: string;
-  newPassword: string;
-  oldPassword: string;
-};
-
 /**
  * @description Encryptor interface for encrypting and decrypting seedless onboarding vault.
  */
