@@ -561,6 +561,47 @@ describe('SeedlessOnboardingController', () => {
         },
       );
     });
+
+    it('should throw an error if the password is an empty string', async () => {
+      await withController(
+        {
+          state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS },
+        },
+        async ({ controller }) => {
+          await expect(
+            controller.updatePassword({
+              verifier,
+              verifierID,
+              newPassword: NEW_PASSWORD,
+              oldPassword: '',
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.InvalidEmptyPassword,
+          );
+        },
+      );
+    });
+
+    it('should throw an error if the password is of wrong type', async () => {
+      await withController(
+        {
+          state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS },
+        },
+        async ({ controller }) => {
+          await expect(
+            controller.updatePassword({
+              verifier,
+              verifierID,
+              newPassword: NEW_PASSWORD,
+              // @ts-expect-error invalid password
+              oldPassword: 123,
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.WrongPasswordType,
+          );
+        },
+      );
+    });
   });
 
   describe('#createNewVaultWithAuthData', () => {
