@@ -2,6 +2,6 @@ export declare class MetadataStore {
     #private;
     constructor(keyPrefix: string);
     set(key: string, data: string): Promise<void>;
-    get(key: string): Promise<string | undefined>;
+    get<T extends string | string[]>(key: string): Promise<T>;
 }
 //# sourceMappingURL=MetadataStore.d.mts.map

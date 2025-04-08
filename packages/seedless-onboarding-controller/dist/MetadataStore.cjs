@@ -48,8 +48,8 @@ class MetadataStore {
         if (!response.ok) {
             throw new Error('Failed to get data');
         }
-        const data = await response.json();
-        return data.message;
+        const jsonData = await response.json();
+        return jsonData.data;
     }
 }
 exports.MetadataStore = MetadataStore;

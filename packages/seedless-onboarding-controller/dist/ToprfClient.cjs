@@ -10,9 +10,10 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _ToprfAuthClient_instances, _ToprfAuthClient_mockAuthStore, _ToprfAuthClient_mockMetadataStore, _ToprfAuthClient_encryptor, _ToprfAuthClient_isValidAuthResponse;
+var _ToprfAuthClient_instances, _ToprfAuthClient_mockAuthStore, _ToprfAuthClient_mockMetadataStore, _ToprfAuthClient_encryptor, _ToprfAuthClient_isValidAuthResponse, _ToprfAuthClient_generateMockNodeAuthTokens;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToprfAuthClient = void 0;
+const utils_1 = require("@metamask/utils");
 const constants_1 = require("./constants.cjs");
 const encryption_1 = require("./encryption.cjs");
 const MetadataStore_1 = require("./MetadataStore.cjs");
@@ -42,10 +43,7 @@ class ToprfAuthClient {
         const isValidAuthResponse = __classPrivateFieldGet(this, _ToprfAuthClient_instances, "m", _ToprfAuthClient_isValidAuthResponse).call(this, authenticationResult);
         if (authenticationResult === undefined || !isValidAuthResponse) {
             // generate mock nodeAuthTokens
-            nodeAuthTokens = Array.from({ length: params.indexes.length }, (_, index) => ({
-                nodeAuthToken: `nodeAuthToken-${index}-${params.verifier}-${params.verifierID}`,
-                nodeIndex: params.indexes[index],
-            }));
+            nodeAuthTokens = __classPrivateFieldGet(this, _ToprfAuthClient_instances, "m", _ToprfAuthClient_generateMockNodeAuthTokens).call(this, params.verifier, params.verifierID);
             const data = JSON.stringify({
                 nodeAuthTokens,
                 hasValidEncKey,
@@ -123,10 +121,10 @@ class ToprfAuthClient {
      * @returns A promise that resolves if the operation is successful.
      */
     async addSecretDataItem(params) {
-        const { nodeAuthTokens, encKey, secretData } = params;
+        const { encKey, secretData } = params;
         const encryptedSecretData = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").encrypt(encKey, secretData);
-        const key = nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
-        await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").set(key, encryptedSecretData);
+        const pubKey = (0, utils_1.bytesToHex)(params.authKeyPair.pk);
+        await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").set(pubKey, encryptedSecretData);
     }
     /**
      * This function fetches all secret data items associated with the given
@@ -139,19 +137,19 @@ class ToprfAuthClient {
      *
      * @returns A promise that resolves with the decrypted secret data. Null if no secret data is found.
      */
-    async fetchSecretData(params) {
-        const key = params.nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
-        const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").get(key);
+    async fetchAllSecretData(params) {
+        const pubKey = (0, utils_1.bytesToHex)(params.authKeyPair.pk);
+        const encryptedSecretData = (await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").get(pubKey)) || [];
         const secretData = [];
-        if (encryptedSecretData) {
-            try {
-                const encryptedRawData = new Uint8Array(Buffer.from(encryptedSecretData, 'base64'));
-                const decryptedSecretData = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(params.decKey, encryptedRawData);
-                secretData.push(decryptedSecretData);
-            }
-            catch (e) {
-                throw new Error(constants_1.SeedlessOnboardingControllerError.IncorrectPassword);
-            }
+        try {
+            const decryptedSecretData = encryptedSecretData.map((data) => {
+                const rawData = new Uint8Array(Buffer.from(data, 'base64'));
+                return __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(params.decKey, rawData);
+            });
+            secretData.push(...decryptedSecretData);
+        }
+        catch (e) {
+            throw new Error(constants_1.SeedlessOnboardingControllerError.IncorrectPassword);
         }
         return secretData;
     }
@@ -163,5 +161,12 @@ _ToprfAuthClient_mockAuthStore = new WeakMap(), _ToprfAuthClient_mockMetadataSto
     }
     const parsedAuthResponse = JSON.parse(authResponse);
     return parsedAuthResponse.nodeAuthTokens !== undefined;
+}, _ToprfAuthClient_generateMockNodeAuthTokens = function _ToprfAuthClient_generateMockNodeAuthTokens(verifier, verifierID) {
+    // generate 5 mock nodeAuthTokens
+    const nodeAuthTokens = Array.from({ length: 5 }, (_, index) => ({
+        nodeAuthToken: `nodeAuthToken-${index}-${verifier}-${verifierID}`,
+        nodeIndex: index,
+    }));
+    return nodeAuthTokens;
 };
 //# sourceMappingURL=ToprfClient.cjs.map

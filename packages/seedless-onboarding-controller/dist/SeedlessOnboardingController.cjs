@@ -126,7 +126,7 @@ class SeedlessOnboardingController extends base_controller_1.BaseController {
             verifier,
             verifierID,
         });
-        const secretData = await this.toprfAuthClient.fetchSecretData({
+        const secretData = await this.toprfAuthClient.fetchAllSecretData({
             nodeAuthTokens,
             decKey: encKey,
             authKeyPair,

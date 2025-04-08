@@ -45,8 +45,8 @@ export class MetadataStore {
         if (!response.ok) {
             throw new Error('Failed to get data');
         }
-        const data = await response.json();
-        return data.message;
+        const jsonData = await response.json();
+        return jsonData.data;
     }
 }
 _MetadataStore_baseURL = new WeakMap(), _MetadataStore_keyPrefix = new WeakMap();

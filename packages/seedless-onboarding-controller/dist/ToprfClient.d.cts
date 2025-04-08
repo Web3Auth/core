@@ -1,4 +1,4 @@
-import type { NodeAuthTokens } from "./types.cjs";
+import type { NodeAuthTokens, OAuthVerifier } from "./types.cjs";
 /**
  * SEC1 encoded public key
  */
@@ -18,7 +18,7 @@ export type AuthenticationParams = {
     idTokens: string[];
     endpoints: string[];
     indexes: number[];
-    verifier: string;
+    verifier: OAuthVerifier;
     verifierID: string;
 };
 export type AuthenticationResult = {
@@ -244,6 +244,6 @@ export declare class ToprfAuthClient {
      *
      * @returns A promise that resolves with the decrypted secret data. Null if no secret data is found.
      */
-    fetchSecretData(params: FetchAllSecretDataParams): Promise<Uint8Array[]>;
+    fetchAllSecretData(params: FetchAllSecretDataParams): Promise<Uint8Array[]>;
 }
 //# sourceMappingURL=ToprfClient.d.cts.map
