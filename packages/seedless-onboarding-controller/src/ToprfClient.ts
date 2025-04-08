@@ -1,7 +1,9 @@
+import { bytesToHex } from '@metamask/utils';
+
 import { SeedlessOnboardingControllerError } from './constants';
 import { EncryptorDecryptor } from './encryption';
 import { MetadataStore } from './MetadataStore';
-import type { NodeAuthTokens } from './types';
+import type { NodeAuthTokens, OAuthVerifier } from './types';
 
 /**
  * SEC1 encoded public key
@@ -26,7 +28,7 @@ export type AuthenticationParams = {
   idTokens: string[];
   endpoints: string[];
   indexes: number[];
-  verifier: string;
+  verifier: OAuthVerifier;
   verifierID: string;
 };
 
@@ -245,19 +247,16 @@ export class ToprfAuthClient {
     params: AuthenticationParams,
   ): Promise<AuthenticationResult> {
     const key = `${params.verifier}:${params.verifierID}`;
-    const authenticationResult = await this.#mockAuthStore.get(key);
+    const authenticationResult = await this.#mockAuthStore.get<string>(key);
     let hasValidEncKey = false;
     let nodeAuthTokens: NodeAuthTokens;
 
     const isValidAuthResponse = this.#isValidAuthResponse(authenticationResult);
     if (authenticationResult === undefined || !isValidAuthResponse) {
       // generate mock nodeAuthTokens
-      nodeAuthTokens = Array.from(
-        { length: params.indexes.length },
-        (_, index) => ({
-          nodeAuthToken: `nodeAuthToken-${index}-${params.verifier}-${params.verifierID}`,
-          nodeIndex: params.indexes[index],
-        }),
+      nodeAuthTokens = this.#generateMockNodeAuthTokens(
+        params.verifier,
+        params.verifierID,
       );
       const data = JSON.stringify({
         nodeAuthTokens,
@@ -347,15 +346,12 @@ export class ToprfAuthClient {
    * @returns A promise that resolves if the operation is successful.
    */
   async addSecretDataItem(params: AddSecretDataItemParams): Promise<void> {
-    const { nodeAuthTokens, encKey, secretData } = params;
+    const { encKey, secretData } = params;
 
     const encryptedSecretData = this.#encryptor.encrypt(encKey, secretData);
 
-    const key = nodeAuthTokens.reduce(
-      (acc, token) => `${acc}:${token.nodeAuthToken}`,
-      '',
-    );
-    await this.#mockMetadataStore.set(key, encryptedSecretData);
+    const pubKey = bytesToHex(params.authKeyPair.pk);
+    await this.#mockMetadataStore.set(pubKey, encryptedSecretData);
   }
 
   /**
@@ -369,30 +365,22 @@ export class ToprfAuthClient {
    *
    * @returns A promise that resolves with the decrypted secret data. Null if no secret data is found.
    */
-  async fetchSecretData(
+  async fetchAllSecretData(
     params: FetchAllSecretDataParams,
   ): Promise<Uint8Array[]> {
-    const key = params.nodeAuthTokens.reduce(
-      (acc, token) => `${acc}:${token.nodeAuthToken}`,
-      '',
-    );
-    const encryptedSecretData = await this.#mockMetadataStore.get(key);
+    const pubKey = bytesToHex(params.authKeyPair.pk);
+    const encryptedSecretData =
+      (await this.#mockMetadataStore.get<string[]>(pubKey)) || [];
 
     const secretData: Uint8Array[] = [];
-
-    if (encryptedSecretData) {
-      try {
-        const encryptedRawData = new Uint8Array(
-          Buffer.from(encryptedSecretData, 'base64'),
-        );
-        const decryptedSecretData = this.#encryptor.decrypt(
-          params.decKey,
-          encryptedRawData,
-        );
-        secretData.push(decryptedSecretData);
-      } catch (e) {
-        throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
-      }
+    try {
+      const decryptedSecretData = encryptedSecretData.map((data) => {
+        const rawData = new Uint8Array(Buffer.from(data, 'base64'));
+        return this.#encryptor.decrypt(params.decKey, rawData);
+      });
+      secretData.push(...decryptedSecretData);
+    } catch (e) {
+      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
     }
 
     return secretData;
@@ -406,5 +394,14 @@ export class ToprfAuthClient {
     const parsedAuthResponse = JSON.parse(authResponse);
 
     return parsedAuthResponse.nodeAuthTokens !== undefined;
+  }
+
+  #generateMockNodeAuthTokens(verifier: OAuthVerifier, verifierID: string) {
+    // generate 5 mock nodeAuthTokens
+    const nodeAuthTokens = Array.from({ length: 5 }, (_, index) => ({
+      nodeAuthToken: `nodeAuthToken-${index}-${verifier}-${verifierID}`,
+      nodeIndex: index,
+    }));
+    return nodeAuthTokens;
   }
 }

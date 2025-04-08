@@ -26,7 +26,7 @@ export class MetadataStore {
     }
   }
 
-  async get(key: string): Promise<string | undefined> {
+  async get<T extends string | string[]>(key: string): Promise<T> {
     const url = `${this.#baseURL}/${this.#keyPrefix}/get`;
     const metadataKey = `${this.#keyPrefix}_${key}`;
 
@@ -40,7 +40,7 @@ export class MetadataStore {
     if (!response.ok) {
       throw new Error('Failed to get data');
     }
-    const data = await response.json();
-    return data.message;
+    const jsonData = await response.json();
+    return jsonData.data;
   }
 }
