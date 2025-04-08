@@ -204,11 +204,10 @@ export class SeedlessOnboardingController extends BaseController<
       verifierID,
     });
 
-    const seedPhraseBytes = utf8ToBytes(seedPhrase);
     await this.toprfAuthClient.addSecretDataItem({
       nodeAuthTokens,
       encKey,
-      secretData: seedPhraseBytes,
+      secretData: seedPhrase,
       authKeyPair,
     });
 

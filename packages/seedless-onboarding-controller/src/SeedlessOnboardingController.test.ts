@@ -110,8 +110,9 @@ const verifierID = 'user-test@gmail.com';
 const idTokens = ['idToken'];
 const endpoints = ['https://example.com'];
 const indexes = [1];
-const MOCK_SEED_PHRASE =
-  'horror pink muffin canal young photo magnet runway start elder patch until';
+const MOCK_SEED_PHRASE = utf8ToBytes(
+  'horror pink muffin canal young photo magnet runway start elder patch until',
+);
 
 const MOCK_NODE_AUTH_TOKENS = [
   { nodeAuthToken: 'nodeAuthToken', nodeIndex: 0 },
@@ -247,7 +248,7 @@ describe('SeedlessOnboardingController', () => {
             data: [
               mockToprfEncryptor.encrypt(
                 mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-                utf8ToBytes(MOCK_SEED_PHRASE),
+                MOCK_SEED_PHRASE,
               ),
             ],
           },
@@ -260,7 +261,7 @@ describe('SeedlessOnboardingController', () => {
 
         expect(mockMetadataGet.isDone()).toBe(true);
         expect(secretData).toBeDefined();
-        expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+        expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
       });
     });
 
@@ -284,7 +285,7 @@ describe('SeedlessOnboardingController', () => {
     const MOCK_ENCRYPTED_SRPS = [
       mockToprfEncryptor.encrypt(
         mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-        utf8ToBytes(MOCK_SEED_PHRASE),
+        MOCK_SEED_PHRASE,
       ),
     ];
 
@@ -323,7 +324,7 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockMetadataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
         },
       );
     });
@@ -386,7 +387,7 @@ describe('SeedlessOnboardingController', () => {
 
         expect(mockMetadataGet2.isDone()).toBe(true);
         expect(secretData).toBeDefined();
-        expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+        expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
       });
     });
 
@@ -608,7 +609,7 @@ describe('SeedlessOnboardingController', () => {
               data: [
                 mockToprfEncryptor.encrypt(
                   mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-                  utf8ToBytes(MOCK_SEED_PHRASE),
+                  MOCK_SEED_PHRASE,
                 ),
               ],
             },

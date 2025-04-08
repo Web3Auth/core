@@ -27,7 +27,7 @@ export type CreateSeedlessBackupParams = {
   verifier: OAuthVerifier;
   verifierID: string;
   password: string;
-  seedPhrase: string;
+  seedPhrase: Uint8Array;
 };
 
 export type UpdatePasswordParams = {
