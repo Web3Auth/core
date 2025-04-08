@@ -13,6 +13,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _ToprfAuthClient_instances, _ToprfAuthClient_mockAuthStore, _ToprfAuthClient_mockMetadataStore, _ToprfAuthClient_encryptor, _ToprfAuthClient_isValidAuthResponse;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToprfAuthClient = void 0;
+const constants_1 = require("./constants.cjs");
 const encryption_1 = require("./encryption.cjs");
 const MetadataStore_1 = require("./MetadataStore.cjs");
 // TODO: remove the class once the toprf-sdk is ready
@@ -76,30 +77,83 @@ class ToprfAuthClient {
         });
         await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").set(key, data);
         const encKey = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").keyFromPassword(params.password);
+        const authKeyPair = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").authKeyPairFromPassword(params.password);
         return {
             encKey,
+            authKeyPair,
         };
     }
-    async storeSecretData(params) {
+    /**
+     * This function replaces the existing encryption key with a new one and copies the secret data of existing encryption key to the new one.
+     *
+     * @param params - The parameters for changing the encryption key.
+     * @param params.nodeAuthTokens - The tokens issued by the nodes on authenticating the user.
+     * @param params.newPassword - The new password of the user.
+     * @param params.keyPair - The current encryption key of the user.
+     *
+     * @returns A promise that resolves with the new encryption key.
+     */
+    async changeEncKey(params) {
+        try {
+            const key = `${params.verifier}:${params.verifierID}`;
+            const data = JSON.stringify({
+                nodeAuthTokens: params.nodeAuthTokens,
+                hasValidEncKey: true,
+            });
+            await __classPrivateFieldGet(this, _ToprfAuthClient_mockAuthStore, "f").set(key, data);
+            const encKey = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").keyFromPassword(params.password);
+            const authKeyPair = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").authKeyPairFromPassword(params.password);
+            return {
+                encKey,
+                authKeyPair,
+            };
+        }
+        catch (e) {
+            throw new Error(constants_1.SeedlessOnboardingControllerError.IncorrectPassword);
+        }
+    }
+    /**
+     * This function encrypts the secret data using the encryption key and stores it nodes metadata store in encrypted form.
+     *
+     * @param params - The parameters for registering new secret data.
+     * @param params.nodeAuthTokens - The tokens issued by the nodes on authenticating the user.
+     * @param params.keyPair - The encryption/decryption key pair which is used to encrypt the secret data before storing it.
+     * @param params.secretData - The array of secret data to be registered.
+     *
+     * @returns A promise that resolves if the operation is successful.
+     */
+    async addSecretDataItem(params) {
         const { nodeAuthTokens, encKey, secretData } = params;
         const encryptedSecretData = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").encrypt(encKey, secretData);
         const key = nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
         await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").set(key, encryptedSecretData);
-        return {
-            encKey,
-            encryptedSecretData,
-        };
     }
+    /**
+     * This function fetches all secret data items associated with the given
+     * auth pub key, decrypts, and returns them.
+     *
+     * @param params - The parameters for fetching the secret data.
+     * @param params.nodeAuthTokens - The tokens issued by the nodes on authenticating the user.
+     * @param params.decKey - The decryption key to be used to decrypt the secret data.
+     * @param params.authKeyPair - The authentication key to be used to provide valid signature for fetching the secret data.
+     *
+     * @returns A promise that resolves with the decrypted secret data. Null if no secret data is found.
+     */
     async fetchSecretData(params) {
         const key = params.nodeAuthTokens.reduce((acc, token) => `${acc}:${token.nodeAuthToken}`, '');
         const encryptedSecretData = await __classPrivateFieldGet(this, _ToprfAuthClient_mockMetadataStore, "f").get(key);
-        const secretData = encryptedSecretData
-            ? __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(params.encKey, encryptedSecretData)
-            : null;
-        return {
-            encKey: params.encKey,
-            secretData: secretData ? [secretData] : null,
-        };
+        const secretData = [];
+        if (encryptedSecretData) {
+            try {
+                const encryptedRawData = new Uint8Array(Buffer.from(encryptedSecretData, 'base64'));
+                const decryptedSecretData = __classPrivateFieldGet(this, _ToprfAuthClient_encryptor, "f").decrypt(params.decKey, encryptedRawData);
+                secretData.push(decryptedSecretData);
+            }
+            catch (e) {
+                throw new Error(constants_1.SeedlessOnboardingControllerError.IncorrectPassword);
+            }
+        }
+        return secretData;
     }
 }
 exports.ToprfAuthClient = ToprfAuthClient;

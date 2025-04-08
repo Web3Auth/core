@@ -2,7 +2,7 @@ import type { ControllerGetStateAction, ControllerStateChangeEvent, RestrictedMe
 import { BaseController } from "@metamask/base-controller";
 import type { KeyringControllerStateChangeEvent } from "@metamask/keyring-controller";
 import { ToprfAuthClient } from "./ToprfClient.mjs";
-import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, NodeAuthTokens, OAuthVerifier } from "./types.mjs";
+import type { AuthenticateUserParams, CreateSeedlessBackupParams, Encryptor, NodeAuthTokens, OAuthVerifier, UpdatePasswordParams } from "./types.mjs";
 declare const controllerName = "SeedlessOnboardingController";
 export type SeedlessOnboardingControllerState = {
     /**
@@ -67,10 +67,7 @@ export declare class SeedlessOnboardingController extends BaseController<typeof 
      * @param params.seedPhrase - The seed phrase to backup
      * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
      */
-    createSeedPhraseBackup({ verifier, verifierID, password, seedPhrase, }: CreateSeedlessBackupParams): Promise<{
-        encryptedSeedPhrase: string;
-        encryptionKey: string;
-    }>;
+    createSeedPhraseBackup({ verifier, verifierID, password, seedPhrase, }: CreateSeedlessBackupParams): Promise<void>;
     /**
      * @description Fetch seed phrase metadata from the metadata store.
      * @param verifier - The login provider of the user.
@@ -78,10 +75,19 @@ export declare class SeedlessOnboardingController extends BaseController<typeof 
      * @param password - The password used to create new wallet and seedphrase
      * @returns A promise that resolves to the seed phrase metadata.
      */
-    fetchAndRestoreSeedPhraseMetadata(verifier: OAuthVerifier, verifierID: string, password: string): Promise<{
-        secretData: string[] | null;
-        encryptionKey: string;
-    }>;
+    fetchAndRestoreSeedPhraseMetadata(verifier: OAuthVerifier, verifierID: string, password: string): Promise<Uint8Array[]>;
+    /**
+     * @description Update the password of the seedless onboarding flow.
+     *
+     * Changing password will also update the encryption key and metadata store with new encrypted values.
+     *
+     * @param params - The parameters for updating the password.
+     * @param params.verifierID - The deterministic identifier of the user from the login provider.
+     * @param params.verifier - The login provider of the user.
+     * @param params.newPassword - The new password to update.
+     * @param params.oldPassword - The old password to verify.
+     */
+    updatePassword(params: UpdatePasswordParams): Promise<void>;
 }
 export {};
 //# sourceMappingURL=SeedlessOnboardingController.d.mts.map

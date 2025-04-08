@@ -24,10 +24,11 @@ export type CreateSeedlessBackupParams = {
     password: string;
     seedPhrase: string;
 };
-export type RestoreSeedlessBackupParams = {
-    nodeAuthTokens: NodeAuthTokens;
-    password: string;
-    seedPhrase: string;
+export type UpdatePasswordParams = {
+    verifier: OAuthVerifier;
+    verifierID: string;
+    newPassword: string;
+    oldPassword: string;
 };
 /**
  * @description Encryptor interface for encrypting and decrypting seedless onboarding vault.
