@@ -14,9 +14,9 @@ import {
   handleMockSecretDataGet,
   handleMockSecretDataAdd,
 } from '../tests/__fixtures__/topfClient';
-import { MockToprfEncryptorDecryptor } from '../tests/mocks/encryption';
-import MockVaultEncryptor from '../tests/mocks/mockEncryptor';
 import { createMockSecretDataGetResponse } from '../tests/mocks/toprf';
+import { MockToprfEncryptorDecryptor } from '../tests/mocks/toprfEncryptor';
+import MockVaultEncryptor from '../tests/mocks/vaultEncryptor';
 
 type WithControllerCallback<ReturnValue> = ({
   controller,
@@ -455,6 +455,36 @@ describe('SeedlessOnboardingController', () => {
         },
       );
     });
+
+    it('should throw an error if the restored seed phrases are not in the correct shape', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
+            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            authKeyPair:
+              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
+            rateLimitResetResult: Promise.resolve(),
+          });
+
+          // mock the incorrect data shape
+          jest
+            .spyOn(toprfClient, 'fetchAllSecretDataItems')
+            .mockResolvedValueOnce([
+              utf8ToBytes(JSON.stringify({ key: 'value' })),
+            ]);
+          await expect(
+            controller.fetchAndRestoreSeedPhraseMetadata(
+              verifier,
+              verifierId,
+              MOCK_PASSWORD,
+            ),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.InvalidSeedPhraseMetadata,
+          );
+        },
+      );
+    });
   });
 
   describe('#createNewVaultWithAuthData', () => {
@@ -493,7 +523,7 @@ describe('SeedlessOnboardingController', () => {
             authTokens: MOCK_NODE_AUTH_TOKENS,
             toprfEncryptionKey: Buffer.from(mockEncKey).toString('base64'),
             toprfAuthKeyPair: JSON.stringify({
-              sk: mockAuthKeyPair.sk.toString(),
+              sk: `0x${mockAuthKeyPair.sk.toString(16)}`,
               pk: Buffer.from(mockAuthKeyPair.pk).toString('base64'),
             }),
           });
@@ -589,6 +619,63 @@ describe('SeedlessOnboardingController', () => {
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(controller.state.vault).toBeUndefined();
           expect(controller.state.vault).toBe(initialState.vault);
+        },
+      );
+    });
+
+    it('should throw an error if the passowrd is an empty string', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
+            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            authKeyPair:
+              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
+          });
+
+          // encrypt and store the secret data
+          const mockSecretDataAdd = handleMockSecretDataAdd();
+          await expect(
+            controller.createSeedPhraseBackup({
+              verifier,
+              verifierId,
+              password: '',
+              seedPhrase: MOCK_SEED_PHRASE,
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.InvalidEmptyPassword,
+          );
+
+          expect(mockSecretDataAdd.isDone()).toBe(true);
+        },
+      );
+    });
+
+    it('should throw an error if the passowrd is of wrong type', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
+            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            authKeyPair:
+              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
+          });
+
+          // encrypt and store the secret data
+          const mockSecretDataAdd = handleMockSecretDataAdd();
+          await expect(
+            controller.createSeedPhraseBackup({
+              verifier,
+              verifierId,
+              // @ts-expect-error we are testing wrong password type
+              password: 123,
+              seedPhrase: MOCK_SEED_PHRASE,
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.WrongPasswordType,
+          );
+
+          expect(mockSecretDataAdd.isDone()).toBe(true);
         },
       );
     });
