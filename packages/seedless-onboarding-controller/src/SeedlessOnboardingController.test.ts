@@ -305,7 +305,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
+          const secretData = await controller.fetchAndRestoreSeedPhrase(
             verifier,
             verifierId,
             MOCK_PASSWORD,
@@ -342,7 +342,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
+          const secretData = await controller.fetchAndRestoreSeedPhrase(
             verifier,
             verifierId,
             MOCK_PASSWORD,
@@ -388,7 +388,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
+          const secretData = await controller.fetchAndRestoreSeedPhrase(
             verifier,
             verifierId,
             MOCK_PASSWORD,
@@ -418,7 +418,7 @@ describe('SeedlessOnboardingController', () => {
             );
 
           await expect(
-            controller.fetchAndRestoreSeedPhraseMetadata(
+            controller.fetchAndRestoreSeedPhrase(
               verifier,
               verifierId,
               'INCORRECT_PASSWORD',
@@ -446,7 +446,7 @@ describe('SeedlessOnboardingController', () => {
             .mockRejectedValueOnce(new Error('Failed to decrypt data'));
 
           await expect(
-            controller.fetchAndRestoreSeedPhraseMetadata(
+            controller.fetchAndRestoreSeedPhrase(
               verifier,
               verifierId,
               'INCORRECT_PASSWORD',
@@ -474,7 +474,7 @@ describe('SeedlessOnboardingController', () => {
               utf8ToBytes(JSON.stringify({ key: 'value' })),
             ]);
           await expect(
-            controller.fetchAndRestoreSeedPhraseMetadata(
+            controller.fetchAndRestoreSeedPhrase(
               verifier,
               verifierId,
               MOCK_PASSWORD,
@@ -571,7 +571,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
+          const secretData = await controller.fetchAndRestoreSeedPhrase(
             verifier,
             verifierId,
             MOCK_PASSWORD,
@@ -610,7 +610,7 @@ describe('SeedlessOnboardingController', () => {
               data: [],
             },
           });
-          await controller.fetchAndRestoreSeedPhraseMetadata(
+          await controller.fetchAndRestoreSeedPhrase(
             verifier,
             verifierId,
             MOCK_PASSWORD,

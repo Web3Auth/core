@@ -1,6 +1,6 @@
 import { utf8ToBytes } from '@noble/ciphers/utils';
 
-import { MockToprfEncryptorDecryptor } from './encryption';
+import { MockToprfEncryptorDecryptor } from './toprfEncryptor';
 
 export const TOPRF_BASE_URL = /https:\/\/node-[1-5]\.dev-node\.web3auth\.io/u;
 

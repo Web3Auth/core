@@ -15,6 +15,7 @@ import type {
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
 import { utf8ToBytes } from '@noble/ciphers/utils';
 import { Mutex, type MutexInterface } from 'async-mutex';
+import log from 'loglevel';
 
 import { SeedlessOnboardingControllerError } from './constants';
 import type { Encryptor, OAuthVerifier, UpdatePasswordParams } from './types';
@@ -184,6 +185,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return authenticationResult;
     } catch (error) {
+      log.error('Error authenticating user', error);
       throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
     }
   }
@@ -236,7 +238,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhraseMetadata(
+  async fetchAndRestoreSeedPhrase(
     verifier: OAuthVerifier,
     verifierId: string,
     password: string,
@@ -313,6 +315,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return createEncKeyResult;
     } catch (error) {
+      log.error('Error creating encryption key', error);
       throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
     }
   }
@@ -340,6 +343,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return recoverEncKeyResult;
     } catch (error) {
+      log.error('Error recovering encryption key', error);
       throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
     }
   }
@@ -466,7 +470,7 @@ export class SeedlessOnboardingController extends BaseController<
   }> {
     const b64EncodedEncKey = Buffer.from(encKey).toString('base64');
     const b64EncodedAuthKeyPair = JSON.stringify({
-      sk: authKeyPair.sk.toString(),
+      sk: `0x${authKeyPair.sk.toString(16)}`, // Convert BigInt to hex string
       pk: Buffer.from(authKeyPair.pk).toString('base64'),
     });
 
