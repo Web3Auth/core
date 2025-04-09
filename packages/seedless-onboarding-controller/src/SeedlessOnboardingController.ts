@@ -211,7 +211,7 @@ export class SeedlessOnboardingController extends BaseController<
     password: string;
     seedPhrase: Uint8Array;
   }): Promise<void> {
-    this.#assertIsValidNodeAuthTokens();
+    this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
     // locally evaluate the encryption key from the password
     const { encKey, authKeyPair, oprfKey } = this.toprfClient.createLocalEncKey(
@@ -255,7 +255,7 @@ export class SeedlessOnboardingController extends BaseController<
     verifierId: string,
     password: string,
   ): Promise<Uint8Array[]> {
-    this.#assertIsValidNodeAuthTokens();
+    this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
     const { encKey, authKeyPair } = await this.#recoveryEncKey(
       verifier,
@@ -328,7 +328,9 @@ export class SeedlessOnboardingController extends BaseController<
     oprfKey: bigint;
     authPubKey: SEC1EncodedPublicKey;
   }) {
-    const nodeAuthTokens = this.#getNodeAuthTokens();
+    const { nodeAuthTokens } = this.state;
+    this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
+
     try {
       await this.toprfClient.persistLocalEncKey({
         nodeAuthTokens,
@@ -355,7 +357,8 @@ export class SeedlessOnboardingController extends BaseController<
     verifierId: string,
     password: string,
   ) {
-    const nodeAuthTokens = this.#getNodeAuthTokens();
+    const { nodeAuthTokens } = this.state;
+    this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
 
     try {
       const recoverEncKeyResult = await this.toprfClient.recoverEncKey({
@@ -391,18 +394,6 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
-  /**
-   * @description Get the node auth tokens from the state.
-   * @returns The node auth tokens.
-   */
-  #getNodeAuthTokens() {
-    const { nodeAuthTokens } = this.state;
-    if (!nodeAuthTokens || nodeAuthTokens.length === 0) {
-      throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
-    }
-    return nodeAuthTokens;
-  }
-
   // eslint-disable-next-line no-unused-private-class-members
   async #unlockVault(password: string): Promise<{
     nodeAuthTokens: NodeAuthTokens;
@@ -426,6 +417,16 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
+  /**
+   * Create a new vault with the given authentication data.
+   *
+   * Serialize the authentication and key data which will be stored in the vault.
+   *
+   * @param params - The parameters for creating a new vault.
+   * @param params.password - The password to encrypt the vault.
+   * @param params.rawToprfEncryptionKey - The encryption key to encrypt the vault.
+   * @param params.rawToprfAuthKeyPair - The authentication key pair to encrypt the vault.
+   */
   async #createNewVaultWithAuthData({
     password,
     rawToprfEncryptionKey,
@@ -435,38 +436,47 @@ export class SeedlessOnboardingController extends BaseController<
     rawToprfEncryptionKey: Uint8Array;
     rawToprfAuthKeyPair: KeyPair;
   }): Promise<void> {
+    const { nodeAuthTokens } = this.state;
+    this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
+
     const { toprfEncryptionKey, toprfAuthKeyPair } =
       await this.#serializeKeyData(rawToprfEncryptionKey, rawToprfAuthKeyPair);
 
-    const authTokens = this.#getNodeAuthTokens();
+    const serializedVaultData = JSON.stringify({
+      authTokens: nodeAuthTokens,
+      toprfEncryptionKey,
+      toprfAuthKeyPair,
+    });
 
     await this.#updateVault({
       password,
-      vaultData: {
-        authTokens,
-        toprfEncryptionKey,
-        toprfAuthKeyPair,
-      },
+      serializedVaultData,
     });
   }
 
+  /**
+   * Encrypt and update the vault with the given authentication data.
+   *
+   * @param params - The parameters for updating the vault.
+   * @param params.password - The password to encrypt the vault.
+   * @param params.serializedVaultData - The serialized authentication data to update the vault with.
+   * @returns A promise that resolves to the updated vault.
+   */
   async #updateVault({
     password,
-    vaultData,
+    serializedVaultData,
   }: {
     password: string;
-    vaultData: object;
+    serializedVaultData: string;
   }): Promise<boolean> {
     return this.#withVaultLock(async () => {
       assertIsValidPassword(password);
-
-      const serializedStateData = await this.#getSerializedStateData(vaultData);
 
       const updatedState: Partial<SeedlessOnboardingControllerState> = {};
 
       updatedState.vault = await this.#encryptor.encrypt(
         password,
-        serializedStateData,
+        serializedVaultData,
       );
 
       this.update((state) => {
@@ -494,10 +504,6 @@ export class SeedlessOnboardingController extends BaseController<
     return withLock(this.#vaultOperationMutex, callback);
   }
 
-  async #getSerializedStateData(data: object): Promise<string> {
-    return JSON.stringify(data);
-  }
-
   /**
    * @description Serialize the encryption key and authentication key pair.
    * @param encKey - The encryption key to serialize.
@@ -523,6 +529,13 @@ export class SeedlessOnboardingController extends BaseController<
     };
   }
 
+  /**
+   * Parse and deserialize the authentication data from the vault.
+   *
+   * @param data - The decrypted vault data.
+   * @returns The parsed authentication data.
+   * @throws If the vault data is not valid.
+   */
   async #parseVaultData(data: unknown): Promise<{
     nodeAuthTokens: NodeAuthTokens;
     toprfEncryptionKey: Uint8Array;
@@ -611,13 +624,15 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
-   * Assert that the node auth tokens are present in the state.
+   * Check if the provided value is a valid node auth tokens.
    *
-   * @throws If the node auth tokens are not present in the state.
+   * @param value - The value to check.
+   * @throws If the value is not a valid node auth tokens.
    */
-  #assertIsValidNodeAuthTokens() {
-    const { nodeAuthTokens } = this.state;
-    if (!nodeAuthTokens || nodeAuthTokens.length === 0) {
+  #assertIsValidNodeAuthTokens(
+    value: unknown,
+  ): asserts value is NodeAuthTokens {
+    if (!Array.isArray(value) || value.length === 0) {
       throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
     }
   }
