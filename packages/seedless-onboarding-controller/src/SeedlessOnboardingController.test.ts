@@ -1,4 +1,8 @@
-import type { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
+import type {
+  KeyPair,
+  NodeAuthTokens,
+  ToprfSecureBackup,
+} from '@metamask/toprf-secure-backup';
 import { utf8ToBytes } from '@noble/ciphers/utils';
 
 import { SeedlessOnboardingControllerError } from './constants';
@@ -14,7 +18,10 @@ import {
   handleMockSecretDataGet,
   handleMockSecretDataAdd,
 } from '../tests/__fixtures__/topfClient';
-import { createMockSecretDataGetResponse } from '../tests/mocks/toprf';
+import {
+  createMockSecretDataGetResponse,
+  MULTIPLE_MOCK_SEEDPHRASE_METADATA,
+} from '../tests/mocks/toprf';
 import { MockToprfEncryptorDecryptor } from '../tests/mocks/toprfEncryptor';
 import MockVaultEncryptor from '../tests/mocks/vaultEncryptor';
 
@@ -53,11 +60,11 @@ function buildSeedlessOnboardingControllerMessenger() {
 }
 
 /**
- * Builds a mock encryptor.
+ * Builds a mock encryptor for the vault.
  *
  * @returns The mock encryptor.
  */
-function createMockEncryptor() {
+function createMockVaultEncryptor() {
   return new MockVaultEncryptor();
 }
 
@@ -110,6 +117,106 @@ function createMockToprfEncryptor() {
   return new MockToprfEncryptorDecryptor();
 }
 
+/**
+ * Mocks the createLocalEncKey method of the ToprfSecureBackup instance.
+ *
+ * @param toprfClient - The ToprfSecureBackup instance.
+ * @param MOCK_PASSWORD - The mock password.
+ *
+ * @returns The mock createLocalEncKey result.
+ */
+function mockCreateLocalEncKey(
+  toprfClient: ToprfSecureBackup,
+  MOCK_PASSWORD: string,
+) {
+  const mockToprfEncryptor = createMockToprfEncryptor();
+
+  const encKey = mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD);
+  const authKeyPair = mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD);
+  const oprfKey = BigInt(0);
+  const seed = utf8ToBytes(MOCK_PASSWORD);
+
+  jest.spyOn(toprfClient, 'createLocalEncKey').mockReturnValue({
+    encKey,
+    authKeyPair,
+    oprfKey,
+    seed,
+  });
+
+  return {
+    encKey,
+    authKeyPair,
+    oprfKey,
+    seed,
+  };
+}
+
+/**
+ * Mocks the recoverEncKey method of the ToprfSecureBackup instance.
+ *
+ * @param toprfClient - The ToprfSecureBackup instance.
+ * @param MOCK_PASSWORD - The mock password.
+ *
+ * @returns The mock recoverEncKey result.
+ */
+function mockRecoverEncKey(
+  toprfClient: ToprfSecureBackup,
+  MOCK_PASSWORD: string,
+) {
+  const mockToprfEncryptor = createMockToprfEncryptor();
+
+  const encKey = mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD);
+  const authKeyPair = mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD);
+  const rateLimitResetResult = Promise.resolve();
+
+  jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
+    encKey,
+    authKeyPair,
+    rateLimitResetResult,
+  });
+
+  return {
+    encKey,
+    authKeyPair,
+    rateLimitResetResult,
+  };
+}
+
+/**
+ * Creates a mock vault.
+ *
+ * @param encKey - The encryption key.
+ * @param authKeyPair - The authentication key pair.
+ * @param MOCK_PASSWORD - The mock password.
+ * @param authTokens - The authentication tokens.
+ *
+ * @returns The mock vault data.
+ */
+async function createMockVault(
+  encKey: Uint8Array,
+  authKeyPair: KeyPair,
+  MOCK_PASSWORD: string,
+  authTokens: NodeAuthTokens,
+) {
+  const encryptor = createMockVaultEncryptor();
+
+  const serializedKeyData = JSON.stringify({
+    authTokens,
+    toprfEncryptionKey: Buffer.from(encKey).toString('base64'),
+    toprfAuthKeyPair: JSON.stringify({
+      sk: `0x${authKeyPair.sk.toString(16)}`,
+      pk: Buffer.from(authKeyPair.pk).toString('base64'),
+    }),
+  });
+
+  const encryptedMockVault = await encryptor.encrypt(
+    MOCK_PASSWORD,
+    serializedKeyData,
+  );
+
+  return encryptedMockVault;
+}
+
 const verifier = 'google';
 const verifierId = 'user-test@gmail.com';
 const idTokens = ['idToken'];
@@ -151,7 +258,7 @@ describe('SeedlessOnboardingController', () => {
 
     it('should be able to instantiate with an encryptor', () => {
       const messenger = buildSeedlessOnboardingControllerMessenger();
-      const encryptor = createMockEncryptor();
+      const encryptor = createMockVaultEncryptor();
 
       expect(
         () =>
@@ -233,53 +340,18 @@ describe('SeedlessOnboardingController', () => {
 
   describe('createSeedPhraseBackup', () => {
     const MOCK_PASSWORD = 'mock-password';
-    const mockToprfEncryptor = createMockToprfEncryptor();
-
-    it('should throw an error if user does not have the AuthToken', async () => {
-      await withController(async ({ controller }) => {
-        await expect(
-          controller.createSeedPhraseBackup({
-            verifier,
-            verifierId,
-            seedPhrase: MOCK_SEED_PHRASE,
-            password: MOCK_PASSWORD,
-          }),
-        ).rejects.toThrow(SeedlessOnboardingControllerError.NoOAuthIdToken);
-      });
-    });
-
-    it('should throw an error if create encryption key fails', async () => {
-      await withController(
-        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, toprfClient }) => {
-          jest
-            .spyOn(toprfClient, 'createEncKey')
-            .mockRejectedValue(new Error('Failed to create encryption key'));
-
-          await expect(
-            controller.createSeedPhraseBackup({
-              verifier,
-              verifierId,
-              seedPhrase: MOCK_SEED_PHRASE,
-              password: MOCK_PASSWORD,
-            }),
-          ).rejects.toThrow(
-            SeedlessOnboardingControllerError.AuthenticationError,
-          );
-        },
-      );
-    });
 
     it('should be able to create a seed phrase backup', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, toprfClient }) => {
-          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-          });
+        async ({ controller, toprfClient, initialState, encryptor }) => {
+          const { encKey, authKeyPair } = mockCreateLocalEncKey(
+            toprfClient,
+            MOCK_PASSWORD,
+          );
 
+          // persist the local enc key
+          jest.spyOn(toprfClient, 'persistLocalEncKey').mockResolvedValueOnce();
           // encrypt and store the secret data
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await controller.createSeedPhraseBackup({
@@ -291,49 +363,116 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockSecretDataAdd.isDone()).toBe(true);
 
-          // fetch and decrypt the secret data
-          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-            rateLimitResetResult: Promise.resolve(),
-          });
-          const mockSecretDataGet = handleMockSecretDataGet({
-            status: 200,
-            body: createMockSecretDataGetResponse(
-              [MOCK_SEED_PHRASE],
-              MOCK_PASSWORD,
-            ),
-          });
-          const secretData = await controller.fetchAndRestoreSeedPhrase(
-            verifier,
-            verifierId,
+          expect(controller.state.vault).toBeDefined();
+          expect(controller.state.vault).not.toBe(initialState.vault);
+          expect(controller.state.vault).not.toStrictEqual({});
+
+          // verify the vault data
+          const encryptedMockVault = await createMockVault(
+            encKey,
+            authKeyPair,
             MOCK_PASSWORD,
+            MOCK_NODE_AUTH_TOKENS,
           );
 
-          expect(mockSecretDataGet.isDone()).toBe(true);
-          expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
+          const expectedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            encryptedMockVault,
+          );
+          const resultedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            controller.state.vault as string,
+          );
+
+          expect(expectedVaultValue).toStrictEqual(resultedVaultValue);
+        },
+      );
+    });
+
+    it('should throw an error if create encryption key fails', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient, initialState }) => {
+          jest
+            .spyOn(toprfClient, 'createLocalEncKey')
+            .mockImplementation(() => {
+              throw new Error('Failed to create local encryption key');
+            });
+
+          await expect(
+            controller.createSeedPhraseBackup({
+              verifier,
+              verifierId,
+              seedPhrase: MOCK_SEED_PHRASE,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toThrow('Failed to create local encryption key');
+
+          // verify vault is not created
+          expect(controller.state.vault).toBe(initialState.vault);
+        },
+      );
+    });
+
+    it('should throw an error if user does not have the AuthToken', async () => {
+      await withController(async ({ controller, initialState }) => {
+        await expect(
+          controller.createSeedPhraseBackup({
+            verifier,
+            verifierId,
+            seedPhrase: MOCK_SEED_PHRASE,
+            password: MOCK_PASSWORD,
+          }),
+        ).rejects.toThrow(SeedlessOnboardingControllerError.NoOAuthIdToken);
+
+        // verify vault is not created
+        expect(controller.state.vault).toBe(initialState.vault);
+      });
+    });
+
+    it('should throw an error if persistLocalEncKey fails', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          mockCreateLocalEncKey(toprfClient, MOCK_PASSWORD);
+
+          jest
+            .spyOn(toprfClient, 'persistLocalEncKey')
+            .mockRejectedValueOnce(
+              new Error('Failed to persist local encryption key'),
+            );
+
+          const mockSecretDataAdd = handleMockSecretDataAdd();
+          await expect(
+            controller.createSeedPhraseBackup({
+              verifier,
+              verifierId,
+              seedPhrase: MOCK_SEED_PHRASE,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.AuthenticationError,
+          );
+
+          expect(mockSecretDataAdd.isDone()).toBe(true);
         },
       );
     });
   });
 
-  describe('fetchAndRestoreSeedPhraseMetadata', () => {
+  describe('fetchAndRestoreSeedPhrase', () => {
     const mockToprfEncryptor = createMockToprfEncryptor();
     const MOCK_PASSWORD = 'mock-password';
 
     it('should be able to restore and login with a seed phrase from metadata', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, toprfClient }) => {
+        async ({ controller, toprfClient, initialState, encryptor }) => {
           // fetch and decrypt the secret data
-          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-            rateLimitResetResult: Promise.resolve(),
-          });
+          const { encKey, authKeyPair } = mockRecoverEncKey(
+            toprfClient,
+            MOCK_PASSWORD,
+          );
 
           const mockSecretDataGet = handleMockSecretDataGet({
             status: 200,
@@ -351,6 +490,29 @@ describe('SeedlessOnboardingController', () => {
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
           expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
+
+          expect(controller.state.vault).toBeDefined();
+          expect(controller.state.vault).not.toBe(initialState.vault);
+          expect(controller.state.vault).not.toStrictEqual({});
+
+          // verify the vault data
+          const encryptedMockVault = await createMockVault(
+            encKey,
+            authKeyPair,
+            MOCK_PASSWORD,
+            MOCK_NODE_AUTH_TOKENS,
+          );
+
+          const expectedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            encryptedMockVault,
+          );
+          const resultedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            controller.state.vault as string,
+          );
+
+          expect(expectedVaultValue).toStrictEqual(resultedVaultValue);
         },
       );
     });
@@ -358,33 +520,17 @@ describe('SeedlessOnboardingController', () => {
     it('should be able to restore multiple seed phrases from metadata', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, toprfClient }) => {
+        async ({ controller, toprfClient, encryptor }) => {
           // fetch and decrypt the secret data
-          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-            rateLimitResetResult: Promise.resolve(),
-          });
+          const { encKey, authKeyPair } = mockRecoverEncKey(
+            toprfClient,
+            MOCK_PASSWORD,
+          );
 
-          const MULTI_MOCK_METADATA = [
-            {
-              seedPhrase: utf8ToBytes('seedPhrase1'),
-              timestamp: 10,
-            },
-            {
-              seedPhrase: utf8ToBytes('seedPhrase3'),
-              timestamp: 60,
-            },
-            {
-              seedPhrase: utf8ToBytes('seedPhrase2'),
-              timestamp: 20,
-            },
-          ];
           const mockSecretDataGet = handleMockSecretDataGet({
             status: 200,
             body: createMockSecretDataGetResponse(
-              MULTI_MOCK_METADATA,
+              MULTIPLE_MOCK_SEEDPHRASE_METADATA,
               MOCK_PASSWORD,
             ),
           });
@@ -403,6 +549,25 @@ describe('SeedlessOnboardingController', () => {
             utf8ToBytes('seedPhrase2'),
             utf8ToBytes('seedPhrase3'),
           ]);
+
+          // verify the vault data
+          const encryptedMockVault = await createMockVault(
+            encKey,
+            authKeyPair,
+            MOCK_PASSWORD,
+            MOCK_NODE_AUTH_TOKENS,
+          );
+
+          const expectedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            encryptedMockVault,
+          );
+          const resultedVaultValue = await encryptor.decrypt(
+            MOCK_PASSWORD,
+            controller.state.vault as string,
+          );
+
+          expect(expectedVaultValue).toStrictEqual(resultedVaultValue);
         },
       );
     });
@@ -491,102 +656,6 @@ describe('SeedlessOnboardingController', () => {
     const MOCK_PASSWORD = 'mock-password';
     const mockToprfEncryptor = createMockToprfEncryptor();
 
-    it('should create a vault after seedless backup', async () => {
-      await withController(
-        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, initialState, toprfClient, encryptor }) => {
-          expect(initialState.vault).toBeUndefined();
-
-          const mockEncKey = mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD);
-          const mockAuthKeyPair =
-            mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD);
-
-          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
-            encKey: mockEncKey,
-            authKeyPair: mockAuthKeyPair,
-          });
-
-          const mockSecretDataAdd = handleMockSecretDataAdd();
-          await controller.createSeedPhraseBackup({
-            verifier,
-            verifierId,
-            seedPhrase: MOCK_SEED_PHRASE,
-            password: MOCK_PASSWORD,
-          });
-
-          expect(mockSecretDataAdd.isDone()).toBe(true);
-
-          expect(controller.state.vault).toBeDefined();
-          expect(controller.state.vault).not.toBe(initialState.vault);
-
-          const serializedKeyData = JSON.stringify({
-            authTokens: MOCK_NODE_AUTH_TOKENS,
-            toprfEncryptionKey: Buffer.from(mockEncKey).toString('base64'),
-            toprfAuthKeyPair: JSON.stringify({
-              sk: `0x${mockAuthKeyPair.sk.toString(16)}`,
-              pk: Buffer.from(mockAuthKeyPair.pk).toString('base64'),
-            }),
-          });
-
-          const mockEncVault = await encryptor.encrypt(
-            MOCK_PASSWORD,
-            serializedKeyData,
-          );
-
-          const expectedVaultValue = await encryptor.decrypt(
-            MOCK_PASSWORD,
-            mockEncVault,
-          );
-          const resultedVaultValue = await encryptor.decrypt(
-            MOCK_PASSWORD,
-            controller.state.vault as string,
-          );
-
-          expect(expectedVaultValue).toStrictEqual(serializedKeyData);
-          expect(resultedVaultValue).toStrictEqual(serializedKeyData);
-        },
-      );
-    });
-
-    it('should create a vault after fetching and restoring seed phrase metadata', async () => {
-      await withController(
-        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
-        async ({ controller, initialState, toprfClient }) => {
-          expect(initialState.vault).toBeUndefined();
-
-          const mockEncKey = mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD);
-          const mockAuthKeyPair =
-            mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD);
-
-          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
-            encKey: mockEncKey,
-            authKeyPair: mockAuthKeyPair,
-            rateLimitResetResult: Promise.resolve(),
-          });
-
-          const mockSecretDataGet = handleMockSecretDataGet({
-            status: 200,
-            body: createMockSecretDataGetResponse(
-              [MOCK_SEED_PHRASE],
-              MOCK_PASSWORD,
-            ),
-          });
-          const secretData = await controller.fetchAndRestoreSeedPhrase(
-            verifier,
-            verifierId,
-            MOCK_PASSWORD,
-          );
-
-          expect(mockSecretDataGet.isDone()).toBe(true);
-          expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
-
-          expect(controller.state.vault).toBeDefined();
-          expect(controller.state.vault).not.toBe(initialState.vault);
-        },
-      );
-    });
-
     it('should not create a vault if the user does not have encrypted seed phrase metadata', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
@@ -627,13 +696,11 @@ describe('SeedlessOnboardingController', () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
         async ({ controller, toprfClient }) => {
-          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-          });
-
-          // encrypt and store the secret data
+          // create the local enc key
+          mockCreateLocalEncKey(toprfClient, MOCK_PASSWORD);
+          // persist the local enc key
+          jest.spyOn(toprfClient, 'persistLocalEncKey').mockResolvedValueOnce();
+          // mock the secret data add
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await expect(
             controller.createSeedPhraseBackup({
@@ -655,13 +722,11 @@ describe('SeedlessOnboardingController', () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
         async ({ controller, toprfClient }) => {
-          jest.spyOn(toprfClient, 'createEncKey').mockResolvedValueOnce({
-            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-            authKeyPair:
-              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
-          });
-
-          // encrypt and store the secret data
+          // create the local enc key
+          mockCreateLocalEncKey(toprfClient, MOCK_PASSWORD);
+          // persist the local enc key
+          jest.spyOn(toprfClient, 'persistLocalEncKey').mockResolvedValueOnce();
+          // mock the secret data add
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await expect(
             controller.createSeedPhraseBackup({

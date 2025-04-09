@@ -134,6 +134,7 @@ export default class MockVaultEncryptor {
   async encrypt<R>(
     password: string,
     dataObj: R,
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
     key?: EncryptionKey | CryptoKey,
     salt: string = this.DEFAULT_SALT,
     keyDerivationOptions = this.DEFAULT_DERIVATION_PARAMS,
@@ -149,6 +150,7 @@ export default class MockVaultEncryptor {
   async decrypt(
     password: string,
     text: string,
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
     encryptionKey?: EncryptionKey | CryptoKey,
   ): Promise<unknown> {
     const payload = JSON.parse(text);

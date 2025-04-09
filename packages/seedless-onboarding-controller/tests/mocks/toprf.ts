@@ -43,6 +43,21 @@ export const MOCK_SECRET_DATA_GET_RESPONSE = {
   data: [],
 };
 
+export const MULTIPLE_MOCK_SEEDPHRASE_METADATA = [
+  {
+    seedPhrase: utf8ToBytes('seedPhrase1'),
+    timestamp: 10,
+  },
+  {
+    seedPhrase: utf8ToBytes('seedPhrase3'),
+    timestamp: 60,
+  },
+  {
+    seedPhrase: utf8ToBytes('seedPhrase2'),
+    timestamp: 20,
+  },
+];
+
 /**
  * Creates a mock secret data get response
  *
