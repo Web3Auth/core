@@ -1,5 +1,3 @@
-import { utf8ToBytes } from '@noble/ciphers/utils';
-
 import { MockToprfEncryptorDecryptor } from './toprfEncryptor';
 
 export const TOPRF_BASE_URL = /https:\/\/node-[1-5]\.dev-node\.web3auth\.io/u;
@@ -45,15 +43,15 @@ export const MOCK_SECRET_DATA_GET_RESPONSE = {
 
 export const MULTIPLE_MOCK_SEEDPHRASE_METADATA = [
   {
-    seedPhrase: utf8ToBytes('seedPhrase1'),
+    seedPhrase: new Uint8Array(Buffer.from('seedPhrase1', 'utf-8')),
     timestamp: 10,
   },
   {
-    seedPhrase: utf8ToBytes('seedPhrase3'),
+    seedPhrase: new Uint8Array(Buffer.from('seedPhrase3', 'utf-8')),
     timestamp: 60,
   },
   {
-    seedPhrase: utf8ToBytes('seedPhrase2'),
+    seedPhrase: new Uint8Array(Buffer.from('seedPhrase2', 'utf-8')),
     timestamp: 20,
   },
 ];
@@ -87,7 +85,7 @@ export function createMockSecretDataGetResponse<
 
     return mockToprfEncryptor.encrypt(
       mockToprfEncryptor.keyFromPassword(password),
-      utf8ToBytes(metadata),
+      new Uint8Array(Buffer.from(metadata, 'utf-8')),
     );
   });
 

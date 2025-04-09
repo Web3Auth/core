@@ -3,7 +3,6 @@ import type {
   NodeAuthTokens,
   ToprfSecureBackup,
 } from '@metamask/toprf-secure-backup';
-import { utf8ToBytes } from '@noble/ciphers/utils';
 
 import { SeedlessOnboardingControllerError } from './constants';
 import type {
@@ -134,7 +133,7 @@ function mockCreateLocalEncKey(
   const encKey = mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD);
   const authKeyPair = mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD);
   const oprfKey = BigInt(0);
-  const seed = utf8ToBytes(MOCK_PASSWORD);
+  const seed = new Uint8Array(Buffer.from(MOCK_PASSWORD, 'utf-8'));
 
   jest.spyOn(toprfClient, 'createLocalEncKey').mockReturnValue({
     encKey,
@@ -239,8 +238,11 @@ const MOCK_NODE_AUTH_TOKENS = [
   },
 ];
 
-const MOCK_SEED_PHRASE = utf8ToBytes(
-  'horror pink muffin canal young photo magnet runway start elder patch until',
+const MOCK_SEED_PHRASE = new Uint8Array(
+  Buffer.from(
+    'horror pink muffin canal young photo magnet runway start elder patch until',
+    'utf-8',
+  ),
 );
 
 describe('SeedlessOnboardingController', () => {
@@ -545,9 +547,9 @@ describe('SeedlessOnboardingController', () => {
 
           // `fetchAndRestoreSeedPhraseMetadata` should sort the seed phrases by timestamp and return the seed phrases in the correct order
           expect(secretData).toStrictEqual([
-            utf8ToBytes('seedPhrase1'),
-            utf8ToBytes('seedPhrase2'),
-            utf8ToBytes('seedPhrase3'),
+            new Uint8Array(Buffer.from('seedPhrase1', 'utf-8')),
+            new Uint8Array(Buffer.from('seedPhrase2', 'utf-8')),
+            new Uint8Array(Buffer.from('seedPhrase3', 'utf-8')),
           ]);
 
           // verify the vault data
@@ -636,7 +638,9 @@ describe('SeedlessOnboardingController', () => {
           jest
             .spyOn(toprfClient, 'fetchAllSecretDataItems')
             .mockResolvedValueOnce([
-              utf8ToBytes(JSON.stringify({ key: 'value' })),
+              new Uint8Array(
+                Buffer.from(JSON.stringify({ key: 'value' }), 'utf-8'),
+              ),
             ]);
           await expect(
             controller.fetchAndRestoreSeedPhrase(

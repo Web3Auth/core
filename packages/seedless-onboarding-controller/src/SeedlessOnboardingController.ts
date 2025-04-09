@@ -14,7 +14,6 @@ import type {
   SEC1EncodedPublicKey,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
-import { utf8ToBytes } from '@noble/ciphers/utils';
 import { Mutex, type MutexInterface } from 'async-mutex';
 import log from 'loglevel';
 
@@ -587,7 +586,7 @@ export class SeedlessOnboardingController extends BaseController<
       timestamp: Date.now(),
     });
 
-    return utf8ToBytes(seedPhraseMetadata);
+    return new Uint8Array(Buffer.from(seedPhraseMetadata, 'utf-8'));
   }
 
   /**
