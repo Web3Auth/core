@@ -11,6 +11,7 @@ import type {
   AuthenticateParams,
   KeyPair,
   NodeAuthTokens,
+  SEC1EncodedPublicKey,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
 import { utf8ToBytes } from '@noble/ciphers/utils';
@@ -210,20 +211,31 @@ export class SeedlessOnboardingController extends BaseController<
     password: string;
     seedPhrase: Uint8Array;
   }): Promise<void> {
-    const { encKey, authKeyPair } = await this.#createEncKey(
-      verifier,
-      verifierId,
-      password,
+    this.#assertIsValidNodeAuthTokens();
+
+    // locally evaluate the encryption key from the password
+    const { encKey, authKeyPair, oprfKey } = this.toprfClient.createLocalEncKey(
+      {
+        password,
+      },
     );
 
-    const seedPhraseMetadata = this.#parseSeedPhraseMetadata(seedPhrase);
-
-    await this.toprfClient.addSecretDataItem({
+    // encrypt and store the seed phrase backup
+    await this.#encryptAndStoreSeedPhraseBackup(
+      seedPhrase,
       encKey,
-      secretData: seedPhraseMetadata,
       authKeyPair,
+    );
+
+    // store/presist the encryption key shares
+    await this.#persistLocalEncKey({
+      verifier,
+      verifierId,
+      oprfKey,
+      authPubKey: authKeyPair.pk,
     });
 
+    // create a new vault with the resulting authentication data
     await this.#createNewVaultWithAuthData({
       password,
       rawToprfEncryptionKey: encKey,
@@ -243,6 +255,8 @@ export class SeedlessOnboardingController extends BaseController<
     verifierId: string,
     password: string,
   ): Promise<Uint8Array[]> {
+    this.#assertIsValidNodeAuthTokens();
+
     const { encKey, authKeyPair } = await this.#recoveryEncKey(
       verifier,
       verifierId,
@@ -294,28 +308,37 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
-   * @description Create the encryption key for the seedless onboarding flow.
-   * @param verifier - The login provider of the user.
-   * @param verifierId - The deterministic identifier of the user from the login provider.
-   * @param password - The password used to create new wallet and seedphrase
+   * Persist the encryption key for the seedless onboarding flow.
+   *
+   * @param params - The parameters for persisting the encryption key.
+   * @param params.verifier - The login provider of the user.
+   * @param params.verifierId - The deterministic identifier of the user from the login provider.
+   * @param params.oprfKey - The OPRF key to be splited and persisted.
+   * @param params.authPubKey - The authentication public key.
    * @returns A promise that resolves to the encryption key.
    */
-  async #createEncKey(
-    verifier: OAuthVerifier,
-    verifierId: string,
-    password: string,
-  ) {
+  async #persistLocalEncKey({
+    verifier,
+    verifierId,
+    oprfKey,
+    authPubKey,
+  }: {
+    verifier: OAuthVerifier;
+    verifierId: string;
+    oprfKey: bigint;
+    authPubKey: SEC1EncodedPublicKey;
+  }) {
     const nodeAuthTokens = this.#getNodeAuthTokens();
     try {
-      const createEncKeyResult = await this.toprfClient.createEncKey({
+      await this.toprfClient.persistLocalEncKey({
         nodeAuthTokens,
         verifier,
         verifierId,
-        password,
+        oprfKey,
+        authPubKey,
       });
-      return createEncKeyResult;
     } catch (error) {
-      log.error('Error creating encryption key', error);
+      log.error('Error persisting local encryption key', error);
       throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
     }
   }
@@ -349,12 +372,32 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
+   * Encrypt and store the seed phrase backup in the metadata store.
+   *
+   * @param seedPhrase - The seed phrase to store.
+   * @param encKey - The encryption key to store.
+   * @param authKeyPair - The authentication key pair to store.
+   */
+  async #encryptAndStoreSeedPhraseBackup(
+    seedPhrase: Uint8Array,
+    encKey: Uint8Array,
+    authKeyPair: KeyPair,
+  ) {
+    const seedPhraseMetadata = this.#parseSeedPhraseMetadata(seedPhrase);
+    await this.toprfClient.addSecretDataItem({
+      encKey,
+      secretData: seedPhraseMetadata,
+      authKeyPair,
+    });
+  }
+
+  /**
    * @description Get the node auth tokens from the state.
    * @returns The node auth tokens.
    */
   #getNodeAuthTokens() {
     const { nodeAuthTokens } = this.state;
-    if (!nodeAuthTokens) {
+    if (!nodeAuthTokens || nodeAuthTokens.length === 0) {
       throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
     }
     return nodeAuthTokens;
@@ -565,6 +608,18 @@ export class SeedlessOnboardingController extends BaseController<
     seedPhrases.sort((a, b) => a.timestamp - b.timestamp);
 
     return seedPhrases.map((phrase) => phrase.seedPhrase);
+  }
+
+  /**
+   * Assert that the node auth tokens are present in the state.
+   *
+   * @throws If the node auth tokens are not present in the state.
+   */
+  #assertIsValidNodeAuthTokens() {
+    const { nodeAuthTokens } = this.state;
+    if (!nodeAuthTokens || nodeAuthTokens.length === 0) {
+      throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
+    }
   }
 }
 
