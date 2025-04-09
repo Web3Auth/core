@@ -16,6 +16,7 @@ import {
 } from '../tests/__fixtures__/topfClient';
 import { MockToprfEncryptorDecryptor } from '../tests/mocks/encryption';
 import MockVaultEncryptor from '../tests/mocks/mockEncryptor';
+import { createMockSecretDataGetResponse } from '../tests/mocks/toprf';
 
 type WithControllerCallback<ReturnValue> = ({
   controller,
@@ -131,8 +132,9 @@ const MOCK_NODE_AUTH_TOKENS = [
   },
 ];
 
-const MOCK_SEED_PHRASE =
-  'horror pink muffin canal young photo magnet runway start elder patch until';
+const MOCK_SEED_PHRASE = utf8ToBytes(
+  'horror pink muffin canal young photo magnet runway start elder patch until',
+);
 
 describe('SeedlessOnboardingController', () => {
   describe('constructor', () => {
@@ -298,15 +300,10 @@ describe('SeedlessOnboardingController', () => {
           });
           const mockSecretDataGet = handleMockSecretDataGet({
             status: 200,
-            body: {
-              success: true,
-              data: [
-                mockToprfEncryptor.encrypt(
-                  mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-                  utf8ToBytes(MOCK_SEED_PHRASE),
-                ),
-              ],
-            },
+            body: createMockSecretDataGetResponse(
+              [MOCK_SEED_PHRASE],
+              MOCK_PASSWORD,
+            ),
           });
           const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
             verifier,
@@ -316,7 +313,7 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
         },
       );
     });
@@ -337,17 +334,13 @@ describe('SeedlessOnboardingController', () => {
               mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
             rateLimitResetResult: Promise.resolve(),
           });
+
           const mockSecretDataGet = handleMockSecretDataGet({
             status: 200,
-            body: {
-              success: true,
-              data: [
-                mockToprfEncryptor.encrypt(
-                  mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-                  utf8ToBytes(MOCK_SEED_PHRASE),
-                ),
-              ],
-            },
+            body: createMockSecretDataGetResponse(
+              [MOCK_SEED_PHRASE],
+              MOCK_PASSWORD,
+            ),
           });
           const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
             verifier,
@@ -357,7 +350,59 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
+        },
+      );
+    });
+
+    it('should be able to restore multiple seed phrases from metadata', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          // fetch and decrypt the secret data
+          jest.spyOn(toprfClient, 'recoverEncKey').mockResolvedValueOnce({
+            encKey: mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
+            authKeyPair:
+              mockToprfEncryptor.authKeyPairFromPassword(MOCK_PASSWORD),
+            rateLimitResetResult: Promise.resolve(),
+          });
+
+          const MULTI_MOCK_METADATA = [
+            {
+              seedPhrase: utf8ToBytes('seedPhrase1'),
+              timestamp: 10,
+            },
+            {
+              seedPhrase: utf8ToBytes('seedPhrase3'),
+              timestamp: 60,
+            },
+            {
+              seedPhrase: utf8ToBytes('seedPhrase2'),
+              timestamp: 20,
+            },
+          ];
+          const mockSecretDataGet = handleMockSecretDataGet({
+            status: 200,
+            body: createMockSecretDataGetResponse(
+              MULTI_MOCK_METADATA,
+              MOCK_PASSWORD,
+            ),
+          });
+          const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
+            verifier,
+            verifierId,
+            MOCK_PASSWORD,
+          );
+
+          expect(mockSecretDataGet.isDone()).toBe(true);
+          expect(secretData).toBeDefined();
+
+          // `fetchAndRestoreSeedPhraseMetadata` should sort the seed phrases by timestamp and return the seed phrases in the correct order
+          expect(secretData).toStrictEqual([
+            utf8ToBytes('seedPhrase1'),
+            utf8ToBytes('seedPhrase2'),
+            utf8ToBytes('seedPhrase3'),
+          ]);
         },
       );
     });
@@ -406,9 +451,7 @@ describe('SeedlessOnboardingController', () => {
               verifierId,
               'INCORRECT_PASSWORD',
             ),
-          ).rejects.toThrow(
-            SeedlessOnboardingControllerError.IncorrectPassword,
-          );
+          ).rejects.toThrow('Failed to decrypt data');
         },
       );
     });
@@ -493,15 +536,10 @@ describe('SeedlessOnboardingController', () => {
 
           const mockSecretDataGet = handleMockSecretDataGet({
             status: 200,
-            body: {
-              success: true,
-              data: [
-                mockToprfEncryptor.encrypt(
-                  mockToprfEncryptor.keyFromPassword(MOCK_PASSWORD),
-                  utf8ToBytes(MOCK_SEED_PHRASE),
-                ),
-              ],
-            },
+            body: createMockSecretDataGetResponse(
+              [MOCK_SEED_PHRASE],
+              MOCK_PASSWORD,
+            ),
           });
           const secretData = await controller.fetchAndRestoreSeedPhraseMetadata(
             verifier,
@@ -511,7 +549,7 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
-          expect(secretData).toStrictEqual([utf8ToBytes(MOCK_SEED_PHRASE)]);
+          expect(secretData).toStrictEqual([MOCK_SEED_PHRASE]);
 
           expect(controller.state.vault).toBeDefined();
           expect(controller.state.vault).not.toBe(initialState.vault);

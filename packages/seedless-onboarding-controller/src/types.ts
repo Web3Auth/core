@@ -2,13 +2,6 @@ import type { Json } from '@metamask/utils';
 
 export type OAuthVerifier = 'google' | 'apple';
 
-export type CreateSeedlessBackupParams = {
-  verifier: OAuthVerifier;
-  verifierId: string;
-  password: string;
-  seedPhrase: string;
-};
-
 export type UpdatePasswordParams = {
   verifier: OAuthVerifier;
   verifierID: string;

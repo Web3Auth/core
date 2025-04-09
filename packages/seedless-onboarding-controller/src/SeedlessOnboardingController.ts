@@ -17,12 +17,7 @@ import { utf8ToBytes } from '@noble/ciphers/utils';
 import { Mutex, type MutexInterface } from 'async-mutex';
 
 import { SeedlessOnboardingControllerError } from './constants';
-import type {
-  CreateSeedlessBackupParams,
-  Encryptor,
-  OAuthVerifier,
-  UpdatePasswordParams,
-} from './types';
+import type { Encryptor, OAuthVerifier, UpdatePasswordParams } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
 
@@ -207,17 +202,23 @@ export class SeedlessOnboardingController extends BaseController<
     verifierId,
     password,
     seedPhrase,
-  }: CreateSeedlessBackupParams): Promise<void> {
+  }: {
+    verifier: OAuthVerifier;
+    verifierId: string;
+    password: string;
+    seedPhrase: Uint8Array;
+  }): Promise<void> {
     const { encKey, authKeyPair } = await this.#createEncKey(
       verifier,
       verifierId,
       password,
     );
 
-    const seedPhraseBytes = utf8ToBytes(seedPhrase);
+    const seedPhraseMetadata = this.#parseSeedPhraseMetadata(seedPhrase);
+
     await this.toprfClient.addSecretDataItem({
       encKey,
-      secretData: seedPhraseBytes,
+      secretData: seedPhraseMetadata,
       authKeyPair,
     });
 
@@ -246,24 +247,20 @@ export class SeedlessOnboardingController extends BaseController<
       password,
     );
 
-    try {
-      const secretData = await this.toprfClient.fetchAllSecretDataItems({
-        decKey: encKey,
-        authKeyPair,
+    const secretData = await this.toprfClient.fetchAllSecretDataItems({
+      decKey: encKey,
+      authKeyPair,
+    });
+
+    if (secretData && secretData.length > 0) {
+      await this.#createNewVaultWithAuthData({
+        password,
+        rawToprfEncryptionKey: encKey,
+        rawToprfAuthKeyPair: authKeyPair,
       });
-
-      if (secretData && secretData.length > 0) {
-        await this.#createNewVaultWithAuthData({
-          password,
-          rawToprfEncryptionKey: encKey,
-          rawToprfAuthKeyPair: authKeyPair,
-        });
-      }
-
-      return secretData;
-    } catch (error) {
-      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
     }
+
+    return this.#parseSeedPhraseFromMetadataStore(secretData);
   }
 
   /**
@@ -512,6 +509,58 @@ export class SeedlessOnboardingController extends BaseController<
       toprfEncryptionKey: rawToprfEncryptionKey,
       toprfAuthKeyPair: rawToprfAuthKeyPair,
     };
+  }
+
+  /**
+   * Parse the seed phrase metadata to be stored in the metadata store.
+   *
+   * Along with the seed phrase, we also store the timestamp when the seed phrase was backed up.
+   * This helps us preserve the seedphrase order when the user restores the multiple seedphrase from the metadata store.
+   *
+   * @param seedPhrase - The seed phrase to parse.
+   * @returns The parsed seed phrase metadata.
+   */
+  #parseSeedPhraseMetadata(seedPhrase: Uint8Array): Uint8Array {
+    const b64SeedPhrase = Buffer.from(seedPhrase).toString('base64');
+    const seedPhraseMetadata = JSON.stringify({
+      seedPhrase: b64SeedPhrase,
+      timestamp: Date.now(),
+    });
+
+    return utf8ToBytes(seedPhraseMetadata);
+  }
+
+  /**
+   * Parse the seed phrase metadata from the metadata store.
+   *
+   * @param seedPhraseMetadataArr - The array of SeedPhrase Metadata from the metadata store.
+   * @returns The parsed seed phrase metadata.
+   */
+  #parseSeedPhraseFromMetadataStore(
+    seedPhraseMetadataArr: Uint8Array[],
+  ): Uint8Array[] {
+    const seedPhrases = seedPhraseMetadataArr.map((metadata) => {
+      const serializedMetadata = Buffer.from(metadata).toString('utf-8');
+      const parsedMetadata = JSON.parse(serializedMetadata);
+
+      if ('seedPhrase' in parsedMetadata || 'timestamp' in parsedMetadata) {
+        return {
+          seedPhrase: new Uint8Array(
+            Buffer.from(parsedMetadata.seedPhrase, 'base64'),
+          ),
+          timestamp: parsedMetadata.timestamp,
+        };
+      }
+
+      throw new Error(
+        SeedlessOnboardingControllerError.InvalidSeedPhraseMetadata,
+      );
+    });
+
+    // sort by the timestamp
+    seedPhrases.sort((a, b) => a.timestamp - b.timestamp);
+
+    return seedPhrases.map((phrase) => phrase.seedPhrase);
   }
 }
 

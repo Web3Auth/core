@@ -1,3 +1,7 @@
+import { utf8ToBytes } from '@noble/ciphers/utils';
+
+import { MockToprfEncryptorDecryptor } from './encryption';
+
 export const TOPRF_BASE_URL = /https:\/\/node-[1-5]\.dev-node\.web3auth\.io/u;
 
 export const MOCK_TOPRF_COMMITMENT_RESPONSE = {
@@ -38,3 +42,44 @@ export const MOCK_SECRET_DATA_GET_RESPONSE = {
   success: true,
   data: [],
 };
+
+/**
+ * Creates a mock secret data get response
+ *
+ * @param secretDataArr - The data to be returned
+ * @param password - The password to be used
+ * @returns The mock secret data get response
+ */
+export function createMockSecretDataGetResponse<
+  T extends Uint8Array | { seedPhrase: Uint8Array; timestamp: number },
+>(secretDataArr: T[], password: string) {
+  const mockToprfEncryptor = new MockToprfEncryptorDecryptor();
+
+  const encryptedSecretData = secretDataArr.map((secretData) => {
+    let b64SecretData: string;
+    let timestamp = Date.now();
+    if (secretData instanceof Uint8Array) {
+      b64SecretData = Buffer.from(secretData).toString('base64');
+    } else {
+      b64SecretData = Buffer.from(secretData.seedPhrase).toString('base64');
+      timestamp = secretData.timestamp;
+    }
+
+    const metadata = JSON.stringify({
+      seedPhrase: b64SecretData,
+      timestamp,
+    });
+
+    return mockToprfEncryptor.encrypt(
+      mockToprfEncryptor.keyFromPassword(password),
+      utf8ToBytes(metadata),
+    );
+  });
+
+  const jsonData = {
+    success: true,
+    data: encryptedSecretData,
+  };
+
+  return jsonData;
+}

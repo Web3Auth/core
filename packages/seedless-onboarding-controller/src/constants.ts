@@ -8,4 +8,5 @@ export enum SeedlessOnboardingControllerError {
   VaultError = 'SeedlessOnboardingController - Cannot unlock without a previous vault.',
   MissingVaultData = 'SeedlessOnboardingController - Cannot persist vault without vault information',
   MissingCredentials = 'SeedlessOnboardingController - Cannot persist vault without password',
+  InvalidSeedPhraseMetadata = 'SeedlessOnboardingController - Invalid seed phrase metadata',
 }
