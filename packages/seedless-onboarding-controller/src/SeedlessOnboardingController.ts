@@ -18,7 +18,7 @@ import { Mutex, type MutexInterface } from 'async-mutex';
 import log from 'loglevel';
 
 import { SeedlessOnboardingControllerError } from './constants';
-import type { Encryptor, OAuthVerifier, UpdatePasswordParams } from './types';
+import type { Encryptor, OAuthVerifier } from './types';
 
 const controllerName = 'SeedlessOnboardingController';
 
@@ -227,7 +227,7 @@ export class SeedlessOnboardingController extends BaseController<
     );
 
     // store/presist the encryption key shares
-    await this.#persistLocalEncKey({
+    await this.#persistOprfKey({
       verifier,
       verifierId,
       oprfKey,
@@ -284,26 +284,60 @@ export class SeedlessOnboardingController extends BaseController<
    * Changing password will also update the encryption key and metadata store with new encrypted values.
    *
    * @param params - The parameters for updating the password.
-   * @param params.verifierID - The deterministic identifier of the user from the login provider.
+   * @param params.verifierId - The deterministic identifier of the user from the login provider.
    * @param params.verifier - The login provider of the user.
    * @param params.newPassword - The new password to update.
    * @param params.oldPassword - The old password to verify.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async updatePassword(params: UpdatePasswordParams) {
-    // TODO: implement this once we have the `changePassword` method in Toprf Client
-    // const { verifier, verifierID, newPassword, oldPassword } = params;
-    // // 1. unlock the encrypted vault with old password, retrieve the ek and authTokens from the vault
-    // const { nodeAuthTokens, toprfEncryptionKey, toprfAuthKeyPair } =
-    //   await this.#unlockVault(oldPassword);
-    // // 2. call changePassword method from Toprf Client with old password, new password
-    // // 3. update and encrypt the vault with new password
-    // await this.#createNewVaultWithAuthData({
-    //   password: newPassword,
-    //   authTokens: nodeAuthTokens,
-    //   rawToprfEncryptionKey: newEncKey,
-    //   rawToprfAuthKeyPair: newAuthKeyPair,
-    // });
+  async updatePassword(params: {
+    verifier: OAuthVerifier;
+    verifierId: string;
+    newPassword: string;
+    oldPassword: string;
+  }) {
+    this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
+
+    // verify the old password of the encrypted vault
+    await this.#verifyPassword(params.oldPassword);
+
+    // update the encryption key with new password and update the Metadata Store
+    const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
+      await this.#updateEncKey(params);
+
+    // update and encrypt the vault with new password
+    await this.#createNewVaultWithAuthData({
+      password: params.newPassword,
+      rawToprfEncryptionKey: newEncKey,
+      rawToprfAuthKeyPair: newAuthKeyPair,
+    });
+  }
+
+  async #updateEncKey(params: {
+    verifier: OAuthVerifier;
+    verifierId: string;
+    newPassword: string;
+    oldPassword: string;
+  }) {
+    const { verifier, verifierId, newPassword, oldPassword } = params;
+
+    const { nodeAuthTokens } = this.state;
+    this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
+
+    const {
+      encKey,
+      authKeyPair,
+      shareKeyIndex: newShareKeyIndex,
+    } = await this.#recoveryEncKey(verifier, verifierId, oldPassword);
+
+    return await this.toprfClient.changeEncKey({
+      nodeAuthTokens,
+      verifier,
+      verifierId,
+      oldEncKey: encKey,
+      oldAuthKeyPair: authKeyPair,
+      newShareKeyIndex,
+      newPassword,
+    });
   }
 
   /**
@@ -316,7 +350,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.authPubKey - The authentication public key.
    * @returns A promise that resolves to the encryption key.
    */
-  async #persistLocalEncKey({
+  async #persistOprfKey({
     verifier,
     verifierId,
     oprfKey,
@@ -331,7 +365,7 @@ export class SeedlessOnboardingController extends BaseController<
     this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
 
     try {
-      await this.toprfClient.persistLocalEncKey({
+      await this.toprfClient.persistOprfKey({
         nodeAuthTokens,
         verifier,
         verifierId,
@@ -393,8 +427,13 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
-  // eslint-disable-next-line no-unused-private-class-members
-  async #unlockVault(password: string): Promise<{
+  /**
+   * Verify the password of the encrypted vault.
+   *
+   * @param password - The password to verify.
+   * @returns A promise that resolves to the decrypted vault data.
+   */
+  async #verifyPassword(password: string): Promise<{
     nodeAuthTokens: NodeAuthTokens;
     toprfEncryptionKey: Uint8Array;
     toprfAuthKeyPair: KeyPair;
@@ -551,7 +590,7 @@ export class SeedlessOnboardingController extends BaseController<
       !('toprfEncryptionKey' in parsedVaultData) ||
       !('toprfAuthKeyPair' in parsedVaultData)
     ) {
-      throw new Error(SeedlessOnboardingControllerError.VaultDataError);
+      throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
     }
 
     const rawToprfEncryptionKey = new Uint8Array(

@@ -1,7 +1,6 @@
 export enum SeedlessOnboardingControllerError {
   AuthenticationError = 'SeedlessOnboardingController - Authentication error',
   NoOAuthIdToken = 'SeedlessOnboardingController - No OAuth idToken found',
-  IncorrectPassword = 'SeedlessOnboardingController - Incorrect password',
   InvalidEmptyPassword = 'SeedlessOnboardingController - Password cannot be empty.',
   WrongPasswordType = 'SeedlessOnboardingController - Password must be of type string.',
   VaultDataError = 'KeyringController - The decrypted vault has an unexpected shape.',
