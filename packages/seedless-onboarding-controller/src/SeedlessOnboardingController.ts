@@ -1,12 +1,6 @@
-import type {
-  ControllerGetStateAction,
-  ControllerStateChangeEvent,
-  RestrictedMessenger,
-  StateMetadata,
-} from '@metamask/base-controller';
+import type { StateMetadata } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
 import { encrypt, decrypt } from '@metamask/browser-passworder';
-import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
 import type {
   AuthenticateParams,
   KeyPair,
@@ -14,96 +8,18 @@ import type {
   SEC1EncodedPublicKey,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
-import { Mutex, type MutexInterface } from 'async-mutex';
+import { Mutex } from 'async-mutex';
 import log from 'loglevel';
 
-import { SeedlessOnboardingControllerError } from './constants';
-import type { Encryptor, OAuthVerifier } from './types';
-
-const controllerName = 'SeedlessOnboardingController';
-
-/**
- * A function executed within a mutually exclusive lock, with
- * a mutex releaser in its option bag.
- *
- * @param releaseLock - A function to release the lock.
- */
-type MutuallyExclusiveCallback<Result> = ({
-  releaseLock,
-}: {
-  releaseLock: MutexInterface.Releaser;
-}) => Promise<Result>;
-
-// State
-export type SeedlessOnboardingControllerState = {
-  /**
-   * Encrypted array of serialized keyrings data.
-   */
-  vault?: string;
-  /**
-   * The node auth tokens from OAuth User authentication after the Social login.
-   *
-   * This values are used to authenticate users when they go through the Seedless Onboarding flow.
-   */
-  nodeAuthTokens?: NodeAuthTokens;
-  /**
-   * Indicates whether the user has already fully/partially completed the Seedless Onboarding flow.
-   *
-   * An encryption key is generated from user entered password using Threshold OPRF and the seed phrase is encrypted with the key.
-   * During the Seedless Onboarding Authentication step, TOPRF services check whether user has already generated the encryption key.
-   *
-   * If this value is `false`, we can assume that user already has completed the `SeedPhrase` generation step, and user will have to
-   * fetch the `SeedPhrase` with correct password. Otherwise, users will be asked to set up seedphrase and password, first.
-   */
-  isNewUser?: boolean;
-};
-
-// Actions
-export type SeedlessOnboardingControllerGetStateActions =
-  ControllerGetStateAction<
-    typeof controllerName,
-    SeedlessOnboardingControllerState
-  >;
-
-export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
-
-export type SeedlessOnboardingControllerStateChangeEvent =
-  ControllerStateChangeEvent<
-    typeof controllerName,
-    SeedlessOnboardingControllerState
-  >;
-
-// events allowed to be subscribed
-export type AllowedEvents =
-  | KeyringControllerStateChangeEvent
-  | SeedlessOnboardingControllerStateChangeEvent;
-
-// Messenger
-// TODO: re-evaluate and remove uncessary events/actions from the messenger
-export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
-  typeof controllerName,
-  AllowedActions,
-  AllowedEvents,
-  AllowedActions['type'],
-  AllowedEvents['type']
->;
-
-export type SeedlessOnboardingControllerOptions = {
-  messenger: SeedlessOnboardingControllerMessenger;
-
-  network?: 'sapphire_mainnet' | 'sapphire_devnet';
-
-  /**
-   * @description Initial state to set on this controller.
-   */
-  state?: SeedlessOnboardingControllerState;
-
-  /**
-   * @description Encryptor used for encryption and decryption of data.
-   * @default WebCryptoAPI
-   */
-  encryptor?: Encryptor;
-};
+import { controllerName, SeedlessOnboardingControllerError } from './constants';
+import type {
+  Encryptor,
+  MutuallyExclusiveCallback,
+  OAuthVerifier,
+  SeedlessOnboardingControllerMessenger,
+  SeedlessOnboardingControllerOptions,
+  SeedlessOnboardingControllerState,
+} from './types';
 
 /**
  * Seedless Onboarding Controller State Metadata.

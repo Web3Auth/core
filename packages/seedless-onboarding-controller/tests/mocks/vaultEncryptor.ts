@@ -5,8 +5,6 @@ import type {
 } from '@metamask/browser-passworder';
 import { webcrypto } from 'node:crypto';
 
-import { SeedlessOnboardingControllerError } from '../../src/constants';
-
 export default class MockVaultEncryptor {
   DEFAULT_DERIVATION_PARAMS: KeyDerivationOptions = {
     algorithm: 'PBKDF2',

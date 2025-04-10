@@ -1,11 +1,13 @@
+export const controllerName = 'SeedlessOnboardingController';
+
 export enum SeedlessOnboardingControllerError {
-  AuthenticationError = 'SeedlessOnboardingController - Authentication error',
-  NoOAuthIdToken = 'SeedlessOnboardingController - No OAuth idToken found',
-  InvalidEmptyPassword = 'SeedlessOnboardingController - Password cannot be empty.',
-  WrongPasswordType = 'SeedlessOnboardingController - Password must be of type string.',
-  VaultDataError = 'KeyringController - The decrypted vault has an unexpected shape.',
-  VaultError = 'SeedlessOnboardingController - Cannot unlock without a previous vault.',
-  MissingVaultData = 'SeedlessOnboardingController - Cannot persist vault without vault information',
-  MissingCredentials = 'SeedlessOnboardingController - Cannot persist vault without password',
-  InvalidSeedPhraseMetadata = 'SeedlessOnboardingController - Invalid seed phrase metadata',
+  AuthenticationError = `${controllerName} - Authentication error`,
+  NoOAuthIdToken = `${controllerName} - No OAuth idToken found`,
+  InvalidEmptyPassword = `${controllerName} - Password cannot be empty.`,
+  WrongPasswordType = `${controllerName} - Password must be of type string.`,
+  VaultDataError = `${controllerName} - The decrypted vault has an unexpected shape.`,
+  VaultError = `${controllerName} - Cannot unlock without a previous vault.`,
+  MissingVaultData = `${controllerName} - Cannot persist vault without vault information`,
+  MissingCredentials = `${controllerName} - Cannot persist vault without password`,
+  InvalidSeedPhraseMetadata = `${controllerName} - Invalid seed phrase metadata`,
 }
