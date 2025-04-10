@@ -112,21 +112,15 @@ export default class MockVaultEncryptor {
     const vector = Buffer.from(encData.iv, 'base64');
     const key = 'key' in encryptionKey ? encryptionKey.key : encryptionKey;
 
-    let decryptedObj;
-    try {
-      const result = await webcrypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: vector },
-        key,
-        encryptedData,
-      );
+    const result = await webcrypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: vector },
+      key,
+      encryptedData,
+    );
 
-      const decryptedData = new Uint8Array(result);
-      const decryptedStr = Buffer.from(decryptedData).toString();
-      decryptedObj = JSON.parse(decryptedStr);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_e: unknown) {
-      throw new Error(SeedlessOnboardingControllerError.IncorrectPassword);
-    }
+    const decryptedData = new Uint8Array(result);
+    const decryptedStr = Buffer.from(decryptedData).toString();
+    const decryptedObj = JSON.parse(decryptedStr);
 
     return decryptedObj;
   }
