@@ -7,12 +7,12 @@ import type {
 } from '@metamask/toprf-secure-backup';
 
 import { SeedlessOnboardingControllerError } from './constants';
+import { SeedlessOnboardingController } from './SeedlessOnboardingController';
 import type {
   SeedlessOnboardingControllerMessenger,
   SeedlessOnboardingControllerOptions,
   SeedlessOnboardingControllerState,
-} from './SeedlessOnboardingController';
-import { SeedlessOnboardingController } from './SeedlessOnboardingController';
+} from './types';
 import {
   handleMockCommitment,
   handleMockAuthenticate,
