@@ -228,6 +228,16 @@ export class SeedlessOnboardingController extends BaseController<
     });
   }
 
+  /**
+   * Update the encryption key with new password and update the Metadata Store with new encryption key.
+   *
+   * @param params - The parameters for updating the encryption key.
+   * @param params.verifier - The login provider of the user.
+   * @param params.verifierId - The deterministic identifier of the user from the login provider.
+   * @param params.newPassword - The new password to update.
+   * @param params.oldPassword - The old password to verify.
+   * @returns A promise that resolves to new encryption key and authentication key pair.
+   */
   async #updateEncKey(params: {
     verifier: OAuthVerifier;
     verifierId: string;
@@ -264,7 +274,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.verifierId - The deterministic identifier of the user from the login provider.
    * @param params.oprfKey - The OPRF key to be splited and persisted.
    * @param params.authPubKey - The authentication public key.
-   * @returns A promise that resolves to the encryption key.
+   * @returns A promise that resolves to the success of the operation.
    */
   async #persistOprfKey({
     verifier,
@@ -299,7 +309,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param verifier - The login provider of the user.
    * @param verifierId - The deterministic identifier of the user from the login provider.
    * @param password - The password used to derive the encryption key.
-   * @returns A promise that resolves to the encryption key.
+   * @returns A promise that resolves to the encryption key and authentication key pair.
    */
   async #recoveryEncKey(
     verifier: OAuthVerifier,
