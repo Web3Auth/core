@@ -172,7 +172,7 @@ export class SeedlessOnboardingController extends BaseController<
   ): Promise<Uint8Array[]> {
     this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
-    const { encKey, authKeyPair } = await this.#recoveryEncKey(
+    const { encKey, authKeyPair } = await this.#recoverEncKey(
       verifier,
       verifierId,
       password,
@@ -205,7 +205,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.newPassword - The new password to update.
    * @param params.oldPassword - The old password to verify.
    */
-  async updatePassword(params: {
+  async changePassword(params: {
     verifier: OAuthVerifier;
     verifierId: string;
     newPassword: string;
@@ -218,7 +218,7 @@ export class SeedlessOnboardingController extends BaseController<
 
     // update the encryption key with new password and update the Metadata Store
     const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
-      await this.#updateEncKey(params);
+      await this.#changeEncryptionKey(params);
 
     // update and encrypt the vault with new password
     await this.#createNewVaultWithAuthData({
@@ -238,7 +238,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.oldPassword - The old password to verify.
    * @returns A promise that resolves to new encryption key and authentication key pair.
    */
-  async #updateEncKey(params: {
+  async #changeEncryptionKey(params: {
     verifier: OAuthVerifier;
     verifierId: string;
     newPassword: string;
@@ -253,7 +253,7 @@ export class SeedlessOnboardingController extends BaseController<
       encKey,
       authKeyPair,
       shareKeyIndex: newShareKeyIndex,
-    } = await this.#recoveryEncKey(verifier, verifierId, oldPassword);
+    } = await this.#recoverEncKey(verifier, verifierId, oldPassword);
 
     return await this.toprfClient.changeEncKey({
       nodeAuthTokens,
@@ -311,7 +311,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param password - The password used to derive the encryption key.
    * @returns A promise that resolves to the encryption key and authentication key pair.
    */
-  async #recoveryEncKey(
+  async #recoverEncKey(
     verifier: OAuthVerifier,
     verifierId: string,
     password: string,
@@ -345,7 +345,7 @@ export class SeedlessOnboardingController extends BaseController<
     encKey: Uint8Array,
     authKeyPair: KeyPair,
   ) {
-    const seedPhraseMetadata = this.#parseSeedPhraseMetadata(seedPhrase);
+    const seedPhraseMetadata = this.#prepareSeedPhraseMetadata(seedPhrase);
     await this.toprfClient.addSecretDataItem({
       encKey,
       secretData: seedPhraseMetadata,
@@ -536,15 +536,15 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
-   * Parse the seed phrase metadata to be stored in the metadata store.
+   * Prepare the seed phrase metadata to be stored in the metadata store.
    *
    * Along with the seed phrase, we also store the timestamp when the seed phrase was backed up.
    * This helps us preserve the seedphrase order when the user restores the multiple seedphrase from the metadata store.
    *
-   * @param seedPhrase - The seed phrase to parse.
-   * @returns The parsed seed phrase metadata.
+   * @param seedPhrase - The seed phrase to prepare.
+   * @returns The prepared seed phrase metadata.
    */
-  #parseSeedPhraseMetadata(seedPhrase: Uint8Array): Uint8Array {
+  #prepareSeedPhraseMetadata(seedPhrase: Uint8Array): Uint8Array {
     const b64SeedPhrase = Buffer.from(seedPhrase).toString('base64');
     const seedPhraseMetadata = JSON.stringify({
       seedPhrase: b64SeedPhrase,

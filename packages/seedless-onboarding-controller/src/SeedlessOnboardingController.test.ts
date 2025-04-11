@@ -792,7 +792,7 @@ describe('SeedlessOnboardingController', () => {
           const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
             mockChangeEncKey(toprfClient, NEW_MOCK_PASSWORD);
 
-          await controller.updatePassword({
+          await controller.changePassword({
             verifier,
             verifierId,
             newPassword: NEW_MOCK_PASSWORD,
@@ -831,7 +831,7 @@ describe('SeedlessOnboardingController', () => {
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
         async ({ controller }) => {
           await expect(
-            controller.updatePassword({
+            controller.changePassword({
               verifier,
               verifierId,
               newPassword: NEW_MOCK_PASSWORD,
@@ -855,7 +855,7 @@ describe('SeedlessOnboardingController', () => {
             .spyOn(encryptor, 'decrypt')
             .mockResolvedValueOnce({ foo: 'bar' });
           await expect(
-            controller.updatePassword({
+            controller.changePassword({
               verifier,
               verifierId,
               newPassword: NEW_MOCK_PASSWORD,
@@ -877,7 +877,7 @@ describe('SeedlessOnboardingController', () => {
         async ({ controller, encryptor }) => {
           jest.spyOn(encryptor, 'decrypt').mockResolvedValueOnce(MOCK_VAULT);
           await expect(
-            controller.updatePassword({
+            controller.changePassword({
               verifier,
               verifierId,
               newPassword: NEW_MOCK_PASSWORD,
@@ -901,7 +901,7 @@ describe('SeedlessOnboardingController', () => {
             .spyOn(encryptor, 'decrypt')
             .mockRejectedValueOnce(new Error('Incorrect password'));
           await expect(
-            controller.updatePassword({
+            controller.changePassword({
               verifier,
               verifierId,
               newPassword: NEW_MOCK_PASSWORD,
