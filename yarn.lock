@@ -2524,7 +2524,7 @@ __metadata:
 
 "@metamask/auth-network-utils@file:./packages/seedless-onboarding-controller/auth-network-utils.tgz::locator=%40metamask%2Fcore-monorepo%40workspace%3A.":
   version: 0.0.0
-  resolution: "@metamask/auth-network-utils@file:./packages/seedless-onboarding-controller/auth-network-utils.tgz#./packages/seedless-onboarding-controller/auth-network-utils.tgz::hash=f25b30&locator=%40metamask%2Fcore-monorepo%40workspace%3A."
+  resolution: "@metamask/auth-network-utils@file:./packages/seedless-onboarding-controller/auth-network-utils.tgz#./packages/seedless-onboarding-controller/auth-network-utils.tgz::hash=1876f6&locator=%40metamask%2Fcore-monorepo%40workspace%3A."
   dependencies:
     "@noble/curves": "npm:^1.8.1"
     "@noble/hashes": "npm:^1.7.1"
@@ -2535,7 +2535,7 @@ __metadata:
     elliptic: "npm:^6.6.1"
     json-stable-stringify: "npm:^1.2.1"
     loglevel: "npm:^1.9.2"
-  checksum: 10/87fd75277249b26684a69847b262aee544c6bce4cad2448d9f6e8a827d5fdb9fd07c86bb924a1eb2db71164ca0df27ebc4f9ea43a4214ee8ef03172427f88140
+  checksum: 10/78ceb3aded2681d0d58d6c09bebb78671bf4876d5f4be7ac9411f19db9284fd80270210c834019e0d33d3d5cba67bd3fb10da944271674000a37fbe90be7c1bb
   languageName: node
   linkType: hard
 
@@ -4291,7 +4291,7 @@ __metadata:
 
 "@metamask/toprf-secure-backup@file:./toprf-secure-backup.tgz::locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller":
   version: 0.0.0
-  resolution: "@metamask/toprf-secure-backup@file:./toprf-secure-backup.tgz#./toprf-secure-backup.tgz::hash=9206f8&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
+  resolution: "@metamask/toprf-secure-backup@file:./toprf-secure-backup.tgz#./toprf-secure-backup.tgz::hash=9219ab&locator=%40metamask%2Fseedless-onboarding-controller%40workspace%3Apackages%2Fseedless-onboarding-controller"
   dependencies:
     "@metamask/auth-network-utils": "npm:^0.0.0"
     "@noble/ciphers": "npm:^1.2.1"
@@ -4303,7 +4303,7 @@ __metadata:
     "@toruslabs/fetch-node-details": "npm:^15.0.0"
     "@toruslabs/http-helpers": "npm:^8.1.1"
     bn.js: "npm:^5.2.1"
-  checksum: 10/ea2c70409b6c3bebcf923a09e4c5869ab4e465ec83b958a0fcc492991e9d5bfe42f43a17e0b3eee8e6ea61d3511919bc59e404dd8042690cc96c7abe027ab0ba
+  checksum: 10/a54b99e5a94f50856578f9e0e808526190c95484ba0ac6fc725413985eff2dac3c60ce362bcd75dcd693b31bbdf22c7e418a409bd1536d41603191da148c234e
   languageName: node
   linkType: hard
 

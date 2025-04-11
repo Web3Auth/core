@@ -14,10 +14,10 @@ import type {
   SeedlessOnboardingControllerState,
 } from './types';
 import {
-  handleMockCommitment,
-  handleMockAuthenticate,
   handleMockSecretDataGet,
   handleMockSecretDataAdd,
+  handleMockCommitment,
+  handleMockAuthenticate,
 } from '../tests/__fixtures__/topfClient';
 import {
   createMockSecretDataGetResponse,
@@ -380,10 +380,58 @@ describe('SeedlessOnboardingController', () => {
       });
     });
 
+    it('should be able to authenticate with single id verifier', async () => {
+      await withController(async ({ controller, toprfClient }) => {
+        const aggregateVerifier = 'test-aggregate-verifier';
+        const aggregateVerifierId = 'test-aggregate-verifier-id';
+        const aggregateIdTokens = ['mock-aggregate-id-token'];
+        const hashedAggregateIdTokens = ['hashed-mock-aggregate-id-token'];
+
+        // mock the authentication method
+        jest.spyOn(toprfClient, 'authenticate').mockResolvedValue({
+          nodeAuthTokens: MOCK_NODE_AUTH_TOKENS,
+          isNewUser: true,
+        });
+
+        const authResult = await controller.authenticate({
+          idTokens: hashedAggregateIdTokens,
+          verifier: aggregateVerifier,
+          verifierID: aggregateVerifierId,
+          singleIdVerifierParams: {
+            subVerifier: verifier,
+            subVerifierIdTokens: aggregateIdTokens,
+          },
+        });
+
+        expect(authResult).toBeDefined();
+        expect(authResult.nodeAuthTokens).toBeDefined();
+        expect(authResult.isNewUser).toBe(true);
+
+        expect(controller.state.nodeAuthTokens).toBeDefined();
+        expect(controller.state.nodeAuthTokens).toStrictEqual(
+          MOCK_NODE_AUTH_TOKENS,
+        );
+      });
+    });
+
     it('should throw an error if the authentication fails', async () => {
+      const JSONRPC_ERROR = {
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Internal error',
+        },
+      };
+
       await withController(async ({ controller }) => {
-        const handleCommitment = handleMockCommitment();
-        const handleAuthentication = handleMockAuthenticate();
+        const handleCommitment = handleMockCommitment({
+          status: 200,
+          body: JSONRPC_ERROR,
+        });
+        const handleAuthentication = handleMockAuthenticate({
+          status: 200,
+          body: JSONRPC_ERROR,
+        });
         await expect(
           controller.authenticate({
             idTokens,
