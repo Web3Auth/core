@@ -342,7 +342,7 @@ describe('SeedlessOnboardingController', () => {
         const authResult = await controller.authenticate({
           idTokens,
           verifier,
-          verifierID: verifierId,
+          verifierId,
         });
 
         expect(authResult).toBeDefined();
@@ -366,7 +366,7 @@ describe('SeedlessOnboardingController', () => {
         const authResult = await controller.authenticate({
           idTokens,
           verifier,
-          verifierID: verifierId,
+          verifierId,
         });
 
         expect(authResult).toBeDefined();
@@ -396,7 +396,7 @@ describe('SeedlessOnboardingController', () => {
         const authResult = await controller.authenticate({
           idTokens: hashedAggregateIdTokens,
           verifier: aggregateVerifier,
-          verifierID: aggregateVerifierId,
+          verifierId: aggregateVerifierId,
           singleIdVerifierParams: {
             subVerifier: verifier,
             subVerifierIdTokens: aggregateIdTokens,
@@ -436,7 +436,7 @@ describe('SeedlessOnboardingController', () => {
           controller.authenticate({
             idTokens,
             verifier,
-            verifierID: verifierId,
+            verifierId,
           }),
         ).rejects.toThrow(
           SeedlessOnboardingControllerError.AuthenticationError,

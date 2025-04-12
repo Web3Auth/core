@@ -10,8 +10,6 @@ import type { MutexInterface } from 'async-mutex';
 
 import type { controllerName } from './constants';
 
-export type OAuthVerifier = 'google' | 'apple';
-
 // State
 export type SeedlessOnboardingControllerState = {
   /**

@@ -2,7 +2,6 @@ import type { StateMetadata } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
 import { encrypt, decrypt } from '@metamask/browser-passworder';
 import type {
-  AuthenticateParams,
   KeyPair,
   NodeAuthTokens,
   SEC1EncodedPublicKey,
@@ -15,7 +14,6 @@ import { controllerName, SeedlessOnboardingControllerError } from './constants';
 import type {
   Encryptor,
   MutuallyExclusiveCallback,
-  OAuthVerifier,
   SeedlessOnboardingControllerMessenger,
   SeedlessOnboardingControllerOptions,
   SeedlessOnboardingControllerState,
@@ -87,12 +85,24 @@ export class SeedlessOnboardingController extends BaseController<
    * @description Authenticate OAuth user using the seedless onboarding flow
    * and determine if the user is already registered or not.
    * @param params - The parameters for authenticate OAuth user.
-   * @param params.idToken - The ID token from Social login
+   * @param params.idTokens - The ID token from Social login
    * @param params.verifier - OAuth verifier
    * @param params.verifierId - user email or id from Social login
+   * @param params.singleIdVerifierParams - Optional singleIdVerifierParams to be used for the authenticate request.
+   * You can pass this to use aggregate verifier.
+   * @param params.singleIdVerifierParams.subVerifierIdTokens - The sub verifier id tokens.
+   * @param params.singleIdVerifierParams.subVerifier - The sub verifier.
    * @returns A promise that resolves to the authentication result.
    */
-  async authenticate(params: AuthenticateParams) {
+  async authenticate(params: {
+    idTokens: string[];
+    verifier: string;
+    verifierId: string;
+    singleIdVerifierParams?: {
+      subVerifierIdTokens: string[];
+      subVerifier: string;
+    };
+  }) {
     try {
       const authenticationResult = await this.toprfClient.authenticate(params);
       this.update((state) => {
@@ -121,7 +131,7 @@ export class SeedlessOnboardingController extends BaseController<
     password,
     seedPhrase,
   }: {
-    verifier: OAuthVerifier;
+    verifier: string;
     verifierId: string;
     password: string;
     seedPhrase: Uint8Array;
@@ -166,7 +176,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @returns A promise that resolves to the seed phrase metadata.
    */
   async fetchAndRestoreSeedPhrase(
-    verifier: OAuthVerifier,
+    verifier: string,
     verifierId: string,
     password: string,
   ): Promise<Uint8Array[]> {
@@ -206,7 +216,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.oldPassword - The old password to verify.
    */
   async changePassword(params: {
-    verifier: OAuthVerifier;
+    verifier: string;
     verifierId: string;
     newPassword: string;
     oldPassword: string;
@@ -239,7 +249,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @returns A promise that resolves to new encryption key and authentication key pair.
    */
   async #changeEncryptionKey(params: {
-    verifier: OAuthVerifier;
+    verifier: string;
     verifierId: string;
     newPassword: string;
     oldPassword: string;
@@ -282,7 +292,7 @@ export class SeedlessOnboardingController extends BaseController<
     oprfKey,
     authPubKey,
   }: {
-    verifier: OAuthVerifier;
+    verifier: string;
     verifierId: string;
     oprfKey: bigint;
     authPubKey: SEC1EncodedPublicKey;
@@ -311,11 +321,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param password - The password used to derive the encryption key.
    * @returns A promise that resolves to the encryption key and authentication key pair.
    */
-  async #recoverEncKey(
-    verifier: OAuthVerifier,
-    verifierId: string,
-    password: string,
-  ) {
+  async #recoverEncKey(verifier: string, verifierId: string, password: string) {
     const { nodeAuthTokens } = this.state;
     this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
 
