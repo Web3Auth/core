@@ -5,6 +5,7 @@ import type {
   RecoverEncryptionKeyResult,
   ToprfSecureBackup,
 } from '@metamask/toprf-secure-backup';
+import { base64ToBytes, bytesToBase64, stringToBytes } from '@metamask/utils';
 
 import { SeedlessOnboardingControllerError } from './constants';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
@@ -136,7 +137,7 @@ function mockCreateLocalEncKey(
   const encKey = mockToprfEncryptor.keyFromPassword(password);
   const authKeyPair = mockToprfEncryptor.authKeyPairFromPassword(password);
   const oprfKey = BigInt(0);
-  const seed = new Uint8Array(Buffer.from(password, 'utf-8'));
+  const seed = stringToBytes(password);
 
   jest.spyOn(toprfClient, 'createLocalEncKey').mockReturnValue({
     encKey,
@@ -231,10 +232,10 @@ async function createMockVault(
 
   const serializedKeyData = JSON.stringify({
     authTokens,
-    toprfEncryptionKey: Buffer.from(encKey).toString('base64'),
+    toprfEncryptionKey: bytesToBase64(encKey),
     toprfAuthKeyPair: JSON.stringify({
       sk: `0x${authKeyPair.sk.toString(16)}`,
-      pk: Buffer.from(authKeyPair.pk).toString('base64'),
+      pk: bytesToBase64(authKeyPair.pk),
     }),
   });
 
@@ -261,13 +262,13 @@ async function decryptVault(vault: string, password: string) {
 
   const deserializedVault = JSON.parse(decryptedVault as string);
 
-  const toprfEncryptionKey = new Uint8Array(
-    Buffer.from(deserializedVault.toprfEncryptionKey, 'base64'),
+  const toprfEncryptionKey = base64ToBytes(
+    deserializedVault.toprfEncryptionKey,
   );
   const parsedToprfAuthKeyPair = JSON.parse(deserializedVault.toprfAuthKeyPair);
   const toprfAuthKeyPair = {
     sk: BigInt(parsedToprfAuthKeyPair.sk),
-    pk: new Uint8Array(Buffer.from(parsedToprfAuthKeyPair.pk, 'base64')),
+    pk: base64ToBytes(parsedToprfAuthKeyPair.pk),
   };
 
   return {
@@ -299,11 +300,8 @@ const MOCK_NODE_AUTH_TOKENS = [
   },
 ];
 
-const MOCK_SEED_PHRASE = new Uint8Array(
-  Buffer.from(
-    'horror pink muffin canal young photo magnet runway start elder patch until',
-    'utf-8',
-  ),
+const MOCK_SEED_PHRASE = stringToBytes(
+  'horror pink muffin canal young photo magnet runway start elder patch until',
 );
 
 describe('SeedlessOnboardingController', () => {
@@ -651,9 +649,9 @@ describe('SeedlessOnboardingController', () => {
           // `fetchAndRestoreSeedPhraseMetadata` should sort the seed phrases by timestamp and return the seed phrases in the correct order
           // the seed phrases are sorted in descending order, so the firstly created seed phrase is the latest item in the array
           expect(secretData).toStrictEqual([
-            new Uint8Array(Buffer.from('seedPhrase3', 'utf-8')),
-            new Uint8Array(Buffer.from('seedPhrase2', 'utf-8')),
-            new Uint8Array(Buffer.from('seedPhrase1', 'utf-8')),
+            stringToBytes('seedPhrase3'),
+            stringToBytes('seedPhrase2'),
+            stringToBytes('seedPhrase1'),
           ]);
 
           // verify the vault data
@@ -734,9 +732,7 @@ describe('SeedlessOnboardingController', () => {
           jest
             .spyOn(toprfClient, 'fetchAllSecretDataItems')
             .mockResolvedValueOnce([
-              new Uint8Array(
-                Buffer.from(JSON.stringify({ key: 'value' }), 'utf-8'),
-              ),
+              stringToBytes(JSON.stringify({ key: 'value' })),
             ]);
           await expect(
             controller.fetchAndRestoreSeedPhrase({

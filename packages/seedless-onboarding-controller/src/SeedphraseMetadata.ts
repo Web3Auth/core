@@ -1,3 +1,10 @@
+import {
+  base64ToBytes,
+  bytesToBase64,
+  stringToBytes,
+  bytesToString,
+} from '@metamask/utils';
+
 import { SeedlessOnboardingControllerError } from './constants';
 
 /**
@@ -35,8 +42,8 @@ export class SeedphraseMetadata {
    */
   static assertIsValidSeedPhraseMetadata(value: unknown) {
     if (
-      !value ||
       typeof value !== 'object' ||
+      !value ||
       !('seedPhrase' in value) ||
       typeof value.seedPhrase !== 'string' ||
       !('timestamp' in value) ||
@@ -55,14 +62,15 @@ export class SeedphraseMetadata {
    * @returns The parsed seed phrase metadata.
    */
   static fromRawMetadata(rawMetadata: Uint8Array): SeedphraseMetadata {
-    const serializedMetadata = Buffer.from(rawMetadata).toString('utf-8');
-    const parsedMetadata = JSON.parse(serializedMetadata);
+    const serializedMetadata = bytesToString(rawMetadata);
+    const parsedMetadata = JSON.parse(serializedMetadata) as {
+      seedPhrase: string;
+      timestamp: number;
+    };
 
     SeedphraseMetadata.assertIsValidSeedPhraseMetadata(parsedMetadata);
 
-    const seedPhraseBytes = new Uint8Array(
-      Buffer.from(parsedMetadata.seedPhrase, 'base64'),
-    );
+    const seedPhraseBytes = base64ToBytes(parsedMetadata.seedPhrase);
 
     return new SeedphraseMetadata(seedPhraseBytes, parsedMetadata.timestamp);
   }
@@ -83,7 +91,6 @@ export class SeedphraseMetadata {
       if (order === 'asc') {
         return a.timestamp - b.timestamp;
       }
-
       return b.timestamp - a.timestamp;
     });
   }
@@ -102,12 +109,12 @@ export class SeedphraseMetadata {
    * @returns The serialized SeedPhraseMetadata value in bytes.
    */
   toBytes(): Uint8Array {
-    const b64SeedPhrase = Buffer.from(this.#seedPhrase).toString('base64');
+    const b64SeedPhrase = bytesToBase64(this.#seedPhrase);
     const serializedMetadata = JSON.stringify({
       seedPhrase: b64SeedPhrase,
       timestamp: this.#timestamp,
     });
 
-    return new Uint8Array(Buffer.from(serializedMetadata, 'utf-8'));
+    return stringToBytes(serializedMetadata);
   }
 }

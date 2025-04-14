@@ -7,8 +7,13 @@ import type {
   SEC1EncodedPublicKey,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
+import {
+  base64ToBytes,
+  bytesToBase64,
+  stringToBytes,
+  bytesToHex,
+} from '@metamask/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 import { Mutex } from 'async-mutex';
 import log from 'loglevel';
 
@@ -108,7 +113,7 @@ export class SeedlessOnboardingController extends BaseController<
       const verifier = groupedAuthConnectionId || authConnectionId;
       const verifierId = userId;
       const hashedIdTokens = idTokens.map((idToken) => {
-        return bytesToHex(keccak256(utf8ToBytes(idToken)));
+        return bytesToHex(keccak256(stringToBytes(idToken)));
       });
       const authenticationResult = await this.toprfClient.authenticate({
         verifier,
@@ -537,10 +542,11 @@ export class SeedlessOnboardingController extends BaseController<
     toprfEncryptionKey: string;
     toprfAuthKeyPair: string;
   }> {
-    const b64EncodedEncKey = Buffer.from(encKey).toString('base64');
+    const b64EncodedEncKey = bytesToBase64(encKey);
+    // TODO: need to account for padding
     const b64EncodedAuthKeyPair = JSON.stringify({
       sk: `0x${authKeyPair.sk.toString(16)}`, // Convert BigInt to hex string
-      pk: Buffer.from(authKeyPair.pk).toString('base64'),
+      pk: bytesToBase64(authKeyPair.pk),
     });
 
     return {
@@ -574,13 +580,13 @@ export class SeedlessOnboardingController extends BaseController<
 
     this.#assertIsValidVaultData(parsedVaultData);
 
-    const rawToprfEncryptionKey = new Uint8Array(
-      Buffer.from(parsedVaultData.toprfEncryptionKey, 'base64'),
+    const rawToprfEncryptionKey = base64ToBytes(
+      parsedVaultData.toprfEncryptionKey,
     );
     const parsedToprfAuthKeyPair = JSON.parse(parsedVaultData.toprfAuthKeyPair);
     const rawToprfAuthKeyPair = {
       sk: BigInt(parsedToprfAuthKeyPair.sk),
-      pk: new Uint8Array(Buffer.from(parsedToprfAuthKeyPair.pk, 'base64')),
+      pk: base64ToBytes(parsedToprfAuthKeyPair.pk),
     };
 
     return {
