@@ -79,7 +79,7 @@ export function createMockSecretDataGetResponse<
     });
 
     return mockToprfEncryptor.encrypt(
-      mockToprfEncryptor.keyFromPassword(password),
+      mockToprfEncryptor.deriveEncKey(password),
       new Uint8Array(Buffer.from(metadata, 'utf-8')),
     );
   });

@@ -25,7 +25,7 @@ export class MockToprfEncryptorDecryptor {
     return rawData;
   }
 
-  keyFromPassword(password: string): Uint8Array {
+  deriveEncKey(password: string): Uint8Array {
     const seed = sha256(password);
     const key = hkdf(
       sha256,
@@ -37,7 +37,7 @@ export class MockToprfEncryptorDecryptor {
     return key;
   }
 
-  authKeyPairFromPassword(password: string): KeyPair {
+  deriveAuthKeyPair(password: string): KeyPair {
     const seed = sha256(password);
     const k = hkdf(sha256, seed, undefined, this.#HKDF_AUTH_KEY_INFO, 32); // Derive 256 bit key.
 
