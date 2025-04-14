@@ -12,6 +12,7 @@ import {
   bytesToBase64,
   stringToBytes,
   bytesToHex,
+  bigIntToHex,
 } from '@metamask/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import { Mutex } from 'async-mutex';
@@ -27,6 +28,16 @@ import type {
   SeedlessOnboardingControllerState,
   VaultData,
 } from './types';
+/**
+ * toprf flow
+ * what data are we storing and where
+ * Future work - is this compatible to it?
+ * communication with other controllers
+ * security implications of storing data
+ * code naming convention
+ * ts, js imports + usage + error mgmt + error flow
+ * padding issues
+ */
 
 /**
  * Seedless Onboarding Controller State Metadata.
@@ -41,15 +52,22 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       persist: true,
       anonymous: false,
     },
+    // TODO: no need to persist this
     isNewUser: {
       persist: true,
       anonymous: false,
     },
+    // TODO: fix this and fetch nodeAuthTokens from vault when they are not available in state and rehydrate state as needed (may change after password sync discussion)
     nodeAuthTokens: {
       persist: false,
       anonymous: true,
     },
   };
+
+// TODO: what to do when nodeAuthTokens are expired? - expires based on login timeout (24 hours)
+// TODO: what to do when toprfEncryptionKey expires? - expires when user changes password
+// TODO: what to do when toprfAuthKeyPair expires? - expires when user changes password
+// TODO: support password syncing when available
 
 export const defaultState: SeedlessOnboardingControllerState = {
   isNewUser: true,
@@ -175,7 +193,10 @@ export class SeedlessOnboardingController extends BaseController<
       authKeyPair,
     );
 
-    // store/presist the encryption key shares
+    // store/persist the encryption key shares
+    // We store the seed phrase metadata in the metadata store first. If this operation fails,
+    // we avoid persisting the encryption key shares to prevent a situation where a user appears
+    // to have an account but with no associated data.
     await this.#persistOprfKey({
       groupedAuthConnectionId,
       authConnectionId,
@@ -183,7 +204,7 @@ export class SeedlessOnboardingController extends BaseController<
       oprfKey,
       authPubKey: authKeyPair.pk,
     });
-
+    // TODO: store srp hashes or some identifier for srp in array to see if a srp is part of backup
     // create a new vault with the resulting authentication data
     await this.#createNewVaultWithAuthData({
       password,
@@ -224,14 +245,14 @@ export class SeedlessOnboardingController extends BaseController<
       authKeyPair,
     });
 
-    if (secretData && secretData.length > 0) {
+    if (secretData?.length > 0) {
       await this.#createNewVaultWithAuthData({
         password,
         rawToprfEncryptionKey: encKey,
         rawToprfAuthKeyPair: authKeyPair,
       });
     }
-
+    // TODO: store srp hashes or some identifier for srp in array to see if a srp is part of backup
     return this.#parseSeedPhraseFromMetadataStore(secretData);
   }
 
@@ -386,6 +407,7 @@ export class SeedlessOnboardingController extends BaseController<
         verifier: params.groupedAuthConnectionId || params.authConnectionId,
         verifierId: params.userId,
       });
+      // TODO: we need info about remaining time to reset the rate limit or account lockout
       return recoverEncKeyResult;
     } catch (error) {
       log.error('Error recovering encryption key', error);
@@ -545,7 +567,7 @@ export class SeedlessOnboardingController extends BaseController<
     const b64EncodedEncKey = bytesToBase64(encKey);
     // TODO: need to account for padding
     const b64EncodedAuthKeyPair = JSON.stringify({
-      sk: `0x${authKeyPair.sk.toString(16)}`, // Convert BigInt to hex string
+      sk: bigIntToHex(authKeyPair.sk), // Convert BigInt to hex string
       pk: bytesToBase64(authKeyPair.pk),
     });
 
