@@ -844,6 +844,30 @@ describe('SeedlessOnboardingController', () => {
       );
     });
 
+    it('should throw an error if failed to parse vault data', async () => {
+      await withController(
+        {
+          state: {
+            nodeAuthTokens: MOCK_NODE_AUTH_TOKENS,
+            vault: '{ "foo": "bar"',
+          },
+        },
+        async ({ controller, encryptor }) => {
+          jest
+            .spyOn(encryptor, 'decrypt')
+            .mockResolvedValueOnce('{ "foo": "bar"');
+          await expect(
+            controller.changePassword({
+              verifier,
+              verifierId,
+              newPassword: NEW_MOCK_PASSWORD,
+              oldPassword: MOCK_PASSWORD,
+            }),
+          ).rejects.toThrow(SeedlessOnboardingControllerError.InvalidVaultData);
+        },
+      );
+    });
+
     it('should throw an error if vault unlocked has an unexpected shape', async () => {
       await withController(
         {
@@ -856,6 +880,16 @@ describe('SeedlessOnboardingController', () => {
           jest
             .spyOn(encryptor, 'decrypt')
             .mockResolvedValueOnce({ foo: 'bar' });
+          await expect(
+            controller.changePassword({
+              verifier,
+              verifierId,
+              newPassword: NEW_MOCK_PASSWORD,
+              oldPassword: MOCK_PASSWORD,
+            }),
+          ).rejects.toThrow(SeedlessOnboardingControllerError.InvalidVaultData);
+
+          jest.spyOn(encryptor, 'decrypt').mockResolvedValueOnce('null');
           await expect(
             controller.changePassword({
               verifier,
@@ -885,7 +919,7 @@ describe('SeedlessOnboardingController', () => {
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
-          ).rejects.toThrow(SeedlessOnboardingControllerError.MissingVaultData);
+          ).rejects.toThrow(SeedlessOnboardingControllerError.VaultDataError);
         },
       );
     });
@@ -1002,9 +1036,20 @@ describe('SeedlessOnboardingController', () => {
 
   describe('SeedPhraseMetadata', () => {
     it('should be able to create a seed phrase metadata', () => {
+      // should be able to create a SeedPhraseMetadata instance via constructor
       const seedPhraseMetadata = new SeedphraseMetadata(MOCK_SEED_PHRASE);
       expect(seedPhraseMetadata.seedPhrase).toBeDefined();
       expect(seedPhraseMetadata.timestamp).toBeDefined();
+
+      // should be able to create a SeedPhraseMetadata instance with a timestamp via constructor
+      const timestamp = 18_000;
+      const seedPhraseMetadata2 = new SeedphraseMetadata(
+        MOCK_SEED_PHRASE,
+        timestamp,
+      );
+      expect(seedPhraseMetadata2.seedPhrase).toBeDefined();
+      expect(seedPhraseMetadata2.timestamp).toBe(timestamp);
+      expect(seedPhraseMetadata2.seedPhrase).toStrictEqual(MOCK_SEED_PHRASE);
     });
 
     it('should be able to serialized and parse a seed phrase metadata', () => {

@@ -18,6 +18,7 @@ import type {
   SeedlessOnboardingControllerMessenger,
   SeedlessOnboardingControllerOptions,
   SeedlessOnboardingControllerState,
+  VaultData,
 } from './types';
 
 /**
@@ -514,18 +515,17 @@ export class SeedlessOnboardingController extends BaseController<
     toprfAuthKeyPair: KeyPair;
   }> {
     if (typeof data !== 'string') {
-      throw new Error(SeedlessOnboardingControllerError.VaultDataError);
+      throw new Error(SeedlessOnboardingControllerError.InvalidVaultData);
     }
 
-    const parsedVaultData = JSON.parse(data);
-
-    if (
-      !('authTokens' in parsedVaultData) ||
-      !('toprfEncryptionKey' in parsedVaultData) ||
-      !('toprfAuthKeyPair' in parsedVaultData)
-    ) {
-      throw new Error(SeedlessOnboardingControllerError.MissingVaultData);
+    let parsedVaultData: unknown;
+    try {
+      parsedVaultData = JSON.parse(data);
+    } catch (error) {
+      throw new Error(SeedlessOnboardingControllerError.InvalidVaultData);
     }
+
+    this.#assertIsValidVaultData(parsedVaultData);
 
     const rawToprfEncryptionKey = new Uint8Array(
       Buffer.from(parsedVaultData.toprfEncryptionKey, 'base64'),
@@ -574,6 +574,28 @@ export class SeedlessOnboardingController extends BaseController<
   ): asserts value is NodeAuthTokens {
     if (!Array.isArray(value) || value.length === 0) {
       throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
+    }
+  }
+
+  /**
+   * Check if the provided value is a valid vault data.
+   *
+   * @param value - The value to check.
+   * @throws If the value is not a valid vault data.
+   */
+  #assertIsValidVaultData(value: unknown): asserts value is VaultData {
+    // value is not valid vault data if any of the following conditions are true:
+    if (
+      !value || // value is not defined
+      typeof value !== 'object' || // value is not an object
+      !('authTokens' in value) || // authTokens is not defined
+      typeof value.authTokens !== 'object' || // authTokens is not an object
+      !('toprfEncryptionKey' in value) || // toprfEncryptionKey is not defined
+      typeof value.toprfEncryptionKey !== 'string' || // toprfEncryptionKey is not a string
+      !('toprfAuthKeyPair' in value) || // toprfAuthKeyPair is not defined
+      typeof value.toprfAuthKeyPair !== 'string' // toprfAuthKeyPair is not a string
+    ) {
+      throw new Error(SeedlessOnboardingControllerError.VaultDataError);
     }
   }
 }

@@ -113,3 +113,21 @@ export type MutuallyExclusiveCallback<Result> = ({
 }: {
   releaseLock: MutexInterface.Releaser;
 }) => Promise<Result>;
+
+/**
+ * @description The structure of the data which is serialized and stored in the vault.
+ */
+export type VaultData = {
+  /**
+   * The node auth tokens from OAuth User authentication after the Social login.
+   */
+  authTokens: NodeAuthTokens;
+  /**
+   * The encryption key to encrypt the seed phrase.
+   */
+  toprfEncryptionKey: string;
+  /**
+   * The authentication key pair to authenticate the TOPRF.
+   */
+  toprfAuthKeyPair: string;
+};
