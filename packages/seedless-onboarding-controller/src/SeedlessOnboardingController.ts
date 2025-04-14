@@ -12,6 +12,7 @@ import {
   bytesToBase64,
   stringToBytes,
   bytesToHex,
+  remove0x,
   bigIntToHex,
 } from '@metamask/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
@@ -100,7 +101,7 @@ export class SeedlessOnboardingController extends BaseController<
       messenger,
       metadata: seedlessOnboardingMetadata,
       name: controllerName,
-      state: { ...state, ...defaultState },
+      state: { ...defaultState, ...state },
     });
     if (encryptor) {
       this.#encryptor = encryptor;
@@ -133,13 +134,13 @@ export class SeedlessOnboardingController extends BaseController<
         params;
       const verifier = groupedAuthConnectionId || authConnectionId;
       const verifierId = userId;
-      const hashedIdTokens = idTokens.map((idToken) => {
-        return bytesToHex(keccak256(stringToBytes(idToken)));
+      const hashedIdTokenHexes = idTokens.map((idToken) => {
+        return remove0x(bytesToHex(keccak256(stringToBytes(idToken))));
       });
       const authenticationResult = await this.toprfClient.authenticate({
         verifier,
         verifierId,
-        idTokens: hashedIdTokens,
+        idTokens: hashedIdTokenHexes,
         singleIdVerifierParams: {
           subVerifier: authConnectionId,
           subVerifierIdTokens: idTokens,
