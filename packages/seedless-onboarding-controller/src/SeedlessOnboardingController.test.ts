@@ -276,8 +276,9 @@ async function decryptVault(vault: string, password: string) {
   };
 }
 
-const verifier = 'google';
-const verifierId = 'user-test@gmail.com';
+const authConnectionId = 'seedless-onboarding';
+const groupedAuthConnectionId = 'google';
+const userId = 'user-test@gmail.com';
 const idTokens = ['idToken'];
 
 const MOCK_NODE_AUTH_TOKENS = [
@@ -342,8 +343,8 @@ describe('SeedlessOnboardingController', () => {
 
         const authResult = await controller.authenticate({
           idTokens,
-          verifier,
-          verifierId,
+          authConnectionId,
+          userId,
         });
 
         expect(authResult).toBeDefined();
@@ -366,8 +367,8 @@ describe('SeedlessOnboardingController', () => {
 
         const authResult = await controller.authenticate({
           idTokens,
-          verifier,
-          verifierId,
+          authConnectionId,
+          userId,
         });
 
         expect(authResult).toBeDefined();
@@ -381,13 +382,8 @@ describe('SeedlessOnboardingController', () => {
       });
     });
 
-    it('should be able to authenticate with single id verifier', async () => {
+    it('should be able to authenticate with groupedAuthConnectionId', async () => {
       await withController(async ({ controller, toprfClient }) => {
-        const aggregateVerifier = 'test-aggregate-verifier';
-        const aggregateVerifierId = 'test-aggregate-verifier-id';
-        const aggregateIdTokens = ['mock-aggregate-id-token'];
-        const hashedAggregateIdTokens = ['hashed-mock-aggregate-id-token'];
-
         // mock the authentication method
         jest.spyOn(toprfClient, 'authenticate').mockResolvedValue({
           nodeAuthTokens: MOCK_NODE_AUTH_TOKENS,
@@ -395,13 +391,10 @@ describe('SeedlessOnboardingController', () => {
         });
 
         const authResult = await controller.authenticate({
-          idTokens: hashedAggregateIdTokens,
-          verifier: aggregateVerifier,
-          verifierId: aggregateVerifierId,
-          singleIdVerifierParams: {
-            subVerifier: verifier,
-            subVerifierIdTokens: aggregateIdTokens,
-          },
+          idTokens,
+          authConnectionId,
+          userId,
+          groupedAuthConnectionId,
         });
 
         expect(authResult).toBeDefined();
@@ -436,8 +429,9 @@ describe('SeedlessOnboardingController', () => {
         await expect(
           controller.authenticate({
             idTokens,
-            verifier,
-            verifierId,
+            authConnectionId,
+            groupedAuthConnectionId,
+            userId,
           }),
         ).rejects.toThrow(
           SeedlessOnboardingControllerError.AuthenticationError,
@@ -465,8 +459,8 @@ describe('SeedlessOnboardingController', () => {
           // encrypt and store the secret data
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await controller.createSeedPhraseBackup({
-            verifier,
-            verifierId,
+            authConnectionId,
+            userId,
             seedPhrase: MOCK_SEED_PHRASE,
             password: MOCK_PASSWORD,
           });
@@ -511,8 +505,8 @@ describe('SeedlessOnboardingController', () => {
 
           await expect(
             controller.createSeedPhraseBackup({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
               seedPhrase: MOCK_SEED_PHRASE,
               password: MOCK_PASSWORD,
             }),
@@ -528,8 +522,8 @@ describe('SeedlessOnboardingController', () => {
       await withController(async ({ controller, initialState }) => {
         await expect(
           controller.createSeedPhraseBackup({
-            verifier,
-            verifierId,
+            authConnectionId,
+            userId,
             seedPhrase: MOCK_SEED_PHRASE,
             password: MOCK_PASSWORD,
           }),
@@ -555,8 +549,8 @@ describe('SeedlessOnboardingController', () => {
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await expect(
             controller.createSeedPhraseBackup({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
               seedPhrase: MOCK_SEED_PHRASE,
               password: MOCK_PASSWORD,
             }),
@@ -590,11 +584,12 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhrase(
-            verifier,
-            verifierId,
-            MOCK_PASSWORD,
-          );
+          const secretData = await controller.fetchAndRestoreSeedPhrase({
+            authConnectionId,
+            userId,
+            groupedAuthConnectionId,
+            password: MOCK_PASSWORD,
+          });
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
@@ -643,11 +638,12 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhrase(
-            verifier,
-            verifierId,
-            MOCK_PASSWORD,
-          );
+          const secretData = await controller.fetchAndRestoreSeedPhrase({
+            authConnectionId,
+            userId,
+            groupedAuthConnectionId,
+            password: MOCK_PASSWORD,
+          });
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(secretData).toBeDefined();
@@ -693,11 +689,12 @@ describe('SeedlessOnboardingController', () => {
             );
 
           await expect(
-            controller.fetchAndRestoreSeedPhrase(
-              verifier,
-              verifierId,
-              'INCORRECT_PASSWORD',
-            ),
+            controller.fetchAndRestoreSeedPhrase({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: 'INCORRECT_PASSWORD',
+            }),
           ).rejects.toThrow(
             SeedlessOnboardingControllerError.AuthenticationError,
           );
@@ -716,11 +713,12 @@ describe('SeedlessOnboardingController', () => {
             .mockRejectedValueOnce(new Error('Failed to decrypt data'));
 
           await expect(
-            controller.fetchAndRestoreSeedPhrase(
-              verifier,
-              verifierId,
-              'INCORRECT_PASSWORD',
-            ),
+            controller.fetchAndRestoreSeedPhrase({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: 'INCORRECT_PASSWORD',
+            }),
           ).rejects.toThrow('Failed to decrypt data');
         },
       );
@@ -741,11 +739,12 @@ describe('SeedlessOnboardingController', () => {
               ),
             ]);
           await expect(
-            controller.fetchAndRestoreSeedPhrase(
-              verifier,
-              verifierId,
-              MOCK_PASSWORD,
-            ),
+            controller.fetchAndRestoreSeedPhrase({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: MOCK_PASSWORD,
+            }),
           ).rejects.toThrow(
             SeedlessOnboardingControllerError.InvalidSeedPhraseMetadata,
           );
@@ -754,7 +753,7 @@ describe('SeedlessOnboardingController', () => {
     });
   });
 
-  describe('updatePassword', () => {
+  describe('changePassword', () => {
     const MOCK_PASSWORD = 'mock-password';
     const NEW_MOCK_PASSWORD = 'new-mock-password';
     const MOCK_VAULT = JSON.stringify({ foo: 'bar' });
@@ -770,8 +769,9 @@ describe('SeedlessOnboardingController', () => {
           // encrypt and store the secret data
           handleMockSecretDataAdd();
           await controller.createSeedPhraseBackup({
-            verifier,
-            verifierId,
+            authConnectionId,
+            userId,
+            groupedAuthConnectionId,
             seedPhrase: MOCK_SEED_PHRASE,
             password: MOCK_PASSWORD,
           });
@@ -795,8 +795,78 @@ describe('SeedlessOnboardingController', () => {
             mockChangeEncKey(toprfClient, NEW_MOCK_PASSWORD);
 
           await controller.changePassword({
-            verifier,
-            verifierId,
+            authConnectionId,
+            userId,
+            groupedAuthConnectionId,
+            newPassword: NEW_MOCK_PASSWORD,
+            oldPassword: MOCK_PASSWORD,
+          });
+
+          // verify the vault after update password
+          const vaultAfterUpdatePassword = controller.state.vault;
+          const {
+            toprfEncryptionKey: newEncKeyFromVault,
+            toprfAuthKeyPair: newAuthKeyPairFromVault,
+          } = await decryptVault(
+            vaultAfterUpdatePassword as string,
+            NEW_MOCK_PASSWORD,
+          );
+
+          // verify that the encryption key and auth key pair are updated
+          expect(newEncKeyFromVault).not.toStrictEqual(oldEncKey);
+          expect(newAuthKeyPairFromVault.sk).not.toStrictEqual(
+            oldAuthKeyPair.sk,
+          );
+          expect(newAuthKeyPairFromVault.pk).not.toStrictEqual(
+            oldAuthKeyPair.pk,
+          );
+
+          // verify the vault data is updated with the new encryption key and auth key pair
+          expect(newEncKeyFromVault).toStrictEqual(newEncKey);
+          expect(newAuthKeyPairFromVault.sk).toStrictEqual(newAuthKeyPair.sk);
+          expect(newAuthKeyPairFromVault.pk).toStrictEqual(newAuthKeyPair.pk);
+        },
+      );
+    });
+
+    it('should be able to update new password without groupedAuthConnectionId', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          mockCreateLocalEncKey(toprfClient, MOCK_PASSWORD);
+
+          // persist the local enc key
+          jest.spyOn(toprfClient, 'persistOprfKey').mockResolvedValueOnce();
+          // encrypt and store the secret data
+          handleMockSecretDataAdd();
+          await controller.createSeedPhraseBackup({
+            authConnectionId,
+            userId,
+            seedPhrase: MOCK_SEED_PHRASE,
+            password: MOCK_PASSWORD,
+          });
+
+          // verify the vault data before update password
+          expect(controller.state.vault).toBeDefined();
+          const vaultBeforeUpdatePassword = controller.state.vault;
+          const {
+            toprfEncryptionKey: oldEncKey,
+            toprfAuthKeyPair: oldAuthKeyPair,
+          } = await decryptVault(
+            vaultBeforeUpdatePassword as string,
+            MOCK_PASSWORD,
+          );
+
+          // mock the recover enc key
+          mockRecoverEncKey(toprfClient, MOCK_PASSWORD);
+
+          // mock the change enc key
+          const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
+            mockChangeEncKey(toprfClient, NEW_MOCK_PASSWORD);
+
+          await controller.changePassword({
+            authConnectionId,
+            userId,
             newPassword: NEW_MOCK_PASSWORD,
             oldPassword: MOCK_PASSWORD,
           });
@@ -834,8 +904,9 @@ describe('SeedlessOnboardingController', () => {
         async ({ controller }) => {
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
@@ -858,8 +929,9 @@ describe('SeedlessOnboardingController', () => {
             .mockResolvedValueOnce('{ "foo": "bar"');
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
@@ -882,8 +954,9 @@ describe('SeedlessOnboardingController', () => {
             .mockResolvedValueOnce({ foo: 'bar' });
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
@@ -892,8 +965,9 @@ describe('SeedlessOnboardingController', () => {
           jest.spyOn(encryptor, 'decrypt').mockResolvedValueOnce('null');
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
@@ -914,8 +988,9 @@ describe('SeedlessOnboardingController', () => {
           jest.spyOn(encryptor, 'decrypt').mockResolvedValueOnce(MOCK_VAULT);
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: MOCK_PASSWORD,
             }),
@@ -938,8 +1013,9 @@ describe('SeedlessOnboardingController', () => {
             .mockRejectedValueOnce(new Error('Incorrect password'));
           await expect(
             controller.changePassword({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               newPassword: NEW_MOCK_PASSWORD,
               oldPassword: 'INCORRECT_PASSWORD',
             }),
@@ -967,11 +1043,12 @@ describe('SeedlessOnboardingController', () => {
               data: [],
             },
           });
-          await controller.fetchAndRestoreSeedPhrase(
-            verifier,
-            verifierId,
-            MOCK_PASSWORD,
-          );
+          await controller.fetchAndRestoreSeedPhrase({
+            authConnectionId,
+            userId,
+            groupedAuthConnectionId,
+            password: MOCK_PASSWORD,
+          });
 
           expect(mockSecretDataGet.isDone()).toBe(true);
           expect(controller.state.vault).toBeUndefined();
@@ -992,8 +1069,9 @@ describe('SeedlessOnboardingController', () => {
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await expect(
             controller.createSeedPhraseBackup({
-              verifier,
-              verifierId,
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
               password: '',
               seedPhrase: MOCK_SEED_PHRASE,
             }),
@@ -1018,8 +1096,8 @@ describe('SeedlessOnboardingController', () => {
           const mockSecretDataAdd = handleMockSecretDataAdd();
           await expect(
             controller.createSeedPhraseBackup({
-              verifier,
-              verifierId,
+              verifier: authConnectionId,
+              verifierId: userId,
               // @ts-expect-error we are testing wrong password type
               password: 123,
               seedPhrase: MOCK_SEED_PHRASE,
