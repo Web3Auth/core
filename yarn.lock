@@ -4050,7 +4050,7 @@ __metadata:
     "@metamask/base-controller": "npm:^8.0.0"
     "@metamask/browser-passworder": "npm:^4.3.0"
     "@metamask/keyring-controller": "npm:^21.0.0"
-    "@metamask/toprf-secure-backup": ./toprf-secure-backup.tgz
+    "@metamask/toprf-secure-backup": "file:./toprf-secure-backup.tgz"
     "@noble/ciphers": "npm:^0.5.2"
     "@noble/curves": "npm:^1.2.0"
     "@noble/hashes": "npm:^1.4.0"

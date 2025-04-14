@@ -7,6 +7,8 @@ import type {
   SEC1EncodedPublicKey,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 import { Mutex } from 'async-mutex';
 import log from 'loglevel';
 
@@ -88,25 +90,35 @@ export class SeedlessOnboardingController extends BaseController<
    * and determine if the user is already registered or not.
    * @param params - The parameters for authenticate OAuth user.
    * @param params.idTokens - The ID token from Social login
-   * @param params.verifier - OAuth verifier
-   * @param params.verifierId - user email or id from Social login
-   * @param params.singleIdVerifierParams - Optional singleIdVerifierParams to be used for the authenticate request.
-   * You can pass this to use aggregate verifier.
-   * @param params.singleIdVerifierParams.subVerifierIdTokens - The sub verifier id tokens.
-   * @param params.singleIdVerifierParams.subVerifier - The sub verifier.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.userId - user email or id from Social login
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
    * @returns A promise that resolves to the authentication result.
    */
   async authenticate(params: {
     idTokens: string[];
-    verifier: string;
-    verifierId: string;
-    singleIdVerifierParams?: {
-      subVerifierIdTokens: string[];
-      subVerifier: string;
-    };
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
   }) {
     try {
-      const authenticationResult = await this.toprfClient.authenticate(params);
+      const { idTokens, authConnectionId, groupedAuthConnectionId, userId } =
+        params;
+      const verifier = groupedAuthConnectionId || authConnectionId;
+      const verifierId = userId;
+      const hashedIdTokens = idTokens.map((idToken) => {
+        return bytesToHex(keccak256(utf8ToBytes(idToken)));
+      });
+      const authenticationResult = await this.toprfClient.authenticate({
+        verifier,
+        verifierId,
+        idTokens: hashedIdTokens,
+        singleIdVerifierParams: {
+          subVerifier: authConnectionId,
+          subVerifierIdTokens: idTokens,
+        },
+      });
       this.update((state) => {
         state.nodeAuthTokens = authenticationResult.nodeAuthTokens;
         state.isNewUser = authenticationResult.isNewUser;
@@ -121,20 +133,24 @@ export class SeedlessOnboardingController extends BaseController<
   /**
    * @description Backup seed phrase using the seedless onboarding flow.
    * @param params - The parameters for backup seed phrase.
-   * @param params.verifier - The login provider of the user.
-   * @param params.verifierId - The deterministic identifier of the user from the login provider.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
    * @param params.password - The password used to create new wallet and seedphrase
    * @param params.seedPhrase - The seed phrase to backup
    * @returns A promise that resolves to the encrypted seed phrase and the encryption key.
    */
   async createSeedPhraseBackup({
-    verifier,
-    verifierId,
+    authConnectionId,
+    groupedAuthConnectionId,
+    userId,
     password,
     seedPhrase,
   }: {
-    verifier: string;
-    verifierId: string;
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
     password: string;
     seedPhrase: Uint8Array;
   }): Promise<void> {
@@ -156,8 +172,9 @@ export class SeedlessOnboardingController extends BaseController<
 
     // store/presist the encryption key shares
     await this.#persistOprfKey({
-      verifier,
-      verifierId,
+      groupedAuthConnectionId,
+      authConnectionId,
+      userId,
       oprfKey,
       authPubKey: authKeyPair.pk,
     });
@@ -172,23 +189,30 @@ export class SeedlessOnboardingController extends BaseController<
 
   /**
    * @description Fetch seed phrase metadata from the metadata store.
-   * @param verifier - The login provider of the user.
-   * @param verifierId - The deterministic identifier of the user from the login provider.
-   * @param password - The password used to create new wallet and seedphrase
+   * @param params - The parameters for fetching seed phrase metadata.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
+   * @param params.password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhrase(
-    verifier: string,
-    verifierId: string,
-    password: string,
-  ): Promise<Uint8Array[]> {
+  async fetchAndRestoreSeedPhrase(params: {
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
+    password: string;
+  }): Promise<Uint8Array[]> {
+    const { authConnectionId, groupedAuthConnectionId, userId, password } =
+      params;
     this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
-    const { encKey, authKeyPair } = await this.#recoverEncKey(
-      verifier,
-      verifierId,
+    const { encKey, authKeyPair } = await this.#recoverEncKey({
+      authConnectionId,
+      groupedAuthConnectionId,
+      userId,
       password,
-    );
+    });
 
     const secretData = await this.toprfClient.fetchAllSecretDataItems({
       decKey: encKey,
@@ -212,14 +236,17 @@ export class SeedlessOnboardingController extends BaseController<
    * Changing password will also update the encryption key and metadata store with new encrypted values.
    *
    * @param params - The parameters for updating the password.
-   * @param params.verifierId - The deterministic identifier of the user from the login provider.
-   * @param params.verifier - The login provider of the user.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
    * @param params.newPassword - The new password to update.
    * @param params.oldPassword - The old password to verify.
    */
   async changePassword(params: {
-    verifier: string;
-    verifierId: string;
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
     newPassword: string;
     oldPassword: string;
   }) {
@@ -244,19 +271,28 @@ export class SeedlessOnboardingController extends BaseController<
    * Update the encryption key with new password and update the Metadata Store with new encryption key.
    *
    * @param params - The parameters for updating the encryption key.
-   * @param params.verifier - The login provider of the user.
-   * @param params.verifierId - The deterministic identifier of the user from the login provider.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
    * @param params.newPassword - The new password to update.
    * @param params.oldPassword - The old password to verify.
    * @returns A promise that resolves to new encryption key and authentication key pair.
    */
   async #changeEncryptionKey(params: {
-    verifier: string;
-    verifierId: string;
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
     newPassword: string;
     oldPassword: string;
   }) {
-    const { verifier, verifierId, newPassword, oldPassword } = params;
+    const {
+      authConnectionId,
+      groupedAuthConnectionId,
+      userId,
+      newPassword,
+      oldPassword,
+    } = params;
 
     const { nodeAuthTokens } = this.state;
     this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
@@ -265,12 +301,17 @@ export class SeedlessOnboardingController extends BaseController<
       encKey,
       authKeyPair,
       shareKeyIndex: newShareKeyIndex,
-    } = await this.#recoverEncKey(verifier, verifierId, oldPassword);
+    } = await this.#recoverEncKey({
+      authConnectionId,
+      groupedAuthConnectionId,
+      userId,
+      password: oldPassword,
+    });
 
     return await this.toprfClient.changeEncKey({
       nodeAuthTokens,
-      verifier,
-      verifierId,
+      verifier: groupedAuthConnectionId || authConnectionId,
+      verifierId: userId,
       oldEncKey: encKey,
       oldAuthKeyPair: authKeyPair,
       newShareKeyIndex,
@@ -282,20 +323,18 @@ export class SeedlessOnboardingController extends BaseController<
    * Persist the encryption key for the seedless onboarding flow.
    *
    * @param params - The parameters for persisting the encryption key.
-   * @param params.verifier - The login provider of the user.
-   * @param params.verifierId - The deterministic identifier of the user from the login provider.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
    * @param params.oprfKey - The OPRF key to be splited and persisted.
    * @param params.authPubKey - The authentication public key.
    * @returns A promise that resolves to the success of the operation.
    */
-  async #persistOprfKey({
-    verifier,
-    verifierId,
-    oprfKey,
-    authPubKey,
-  }: {
-    verifier: string;
-    verifierId: string;
+  async #persistOprfKey(params: {
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
     oprfKey: bigint;
     authPubKey: SEC1EncodedPublicKey;
   }) {
@@ -305,10 +344,10 @@ export class SeedlessOnboardingController extends BaseController<
     try {
       await this.toprfClient.persistOprfKey({
         nodeAuthTokens,
-        verifier,
-        verifierId,
-        oprfKey,
-        authPubKey,
+        verifier: params.groupedAuthConnectionId || params.authConnectionId,
+        verifierId: params.userId,
+        oprfKey: params.oprfKey,
+        authPubKey: params.authPubKey,
       });
     } catch (error) {
       log.error('Error persisting local encryption key', error);
@@ -318,21 +357,29 @@ export class SeedlessOnboardingController extends BaseController<
 
   /**
    * @description Recover the encryption key from password.
-   * @param verifier - The login provider of the user.
-   * @param verifierId - The deterministic identifier of the user from the login provider.
-   * @param password - The password used to derive the encryption key.
+   * @param params - The parameters for recovering the encryption key.
+   * @param params.authConnectionId - OAuth authConnectionId from dashboard
+   * @param params.groupedAuthConnectionId - Optional grouped authConnectionId to be used for the authenticate request.
+   * You can pass this to use aggregate connection.
+   * @param params.userId - user email or id from Social login
+   * @param params.password - The password used to derive the encryption key.
    * @returns A promise that resolves to the encryption key and authentication key pair.
    */
-  async #recoverEncKey(verifier: string, verifierId: string, password: string) {
+  async #recoverEncKey(params: {
+    authConnectionId: string;
+    groupedAuthConnectionId?: string;
+    userId: string;
+    password: string;
+  }) {
     const { nodeAuthTokens } = this.state;
     this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
 
     try {
       const recoverEncKeyResult = await this.toprfClient.recoverEncKey({
         nodeAuthTokens,
-        password,
-        verifier,
-        verifierId,
+        password: params.password,
+        verifier: params.groupedAuthConnectionId || params.authConnectionId,
+        verifierId: params.userId,
       });
       return recoverEncKeyResult;
     } catch (error) {
@@ -521,7 +568,7 @@ export class SeedlessOnboardingController extends BaseController<
     let parsedVaultData: unknown;
     try {
       parsedVaultData = JSON.parse(data);
-    } catch (error) {
+    } catch {
       throw new Error(SeedlessOnboardingControllerError.InvalidVaultData);
     }
 
