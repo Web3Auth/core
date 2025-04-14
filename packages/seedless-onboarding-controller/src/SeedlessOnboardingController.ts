@@ -11,6 +11,7 @@ import { Mutex } from 'async-mutex';
 import log from 'loglevel';
 
 import { controllerName, SeedlessOnboardingControllerError } from './constants';
+import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
   Encryptor,
   MutuallyExclusiveCallback,
@@ -351,10 +352,11 @@ export class SeedlessOnboardingController extends BaseController<
     encKey: Uint8Array,
     authKeyPair: KeyPair,
   ) {
-    const seedPhraseMetadata = this.#prepareSeedPhraseMetadata(seedPhrase);
+    const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
+    const secretData = seedPhraseMetadata.toBytes();
     await this.toprfClient.addSecretDataItem({
       encKey,
-      secretData: seedPhraseMetadata,
+      secretData,
       authKeyPair,
     });
   }
@@ -542,25 +544,6 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
-   * Prepare the seed phrase metadata to be stored in the metadata store.
-   *
-   * Along with the seed phrase, we also store the timestamp when the seed phrase was backed up.
-   * This helps us preserve the seedphrase order when the user restores the multiple seedphrase from the metadata store.
-   *
-   * @param seedPhrase - The seed phrase to prepare.
-   * @returns The prepared seed phrase metadata.
-   */
-  #prepareSeedPhraseMetadata(seedPhrase: Uint8Array): Uint8Array {
-    const b64SeedPhrase = Buffer.from(seedPhrase).toString('base64');
-    const seedPhraseMetadata = JSON.stringify({
-      seedPhrase: b64SeedPhrase,
-      timestamp: Date.now(),
-    });
-
-    return new Uint8Array(Buffer.from(seedPhraseMetadata, 'utf-8'));
-  }
-
-  /**
    * Parse the seed phrase metadata from the metadata store.
    *
    * @param seedPhraseMetadataArr - The array of SeedPhrase Metadata from the metadata store.
@@ -569,28 +552,15 @@ export class SeedlessOnboardingController extends BaseController<
   #parseSeedPhraseFromMetadataStore(
     seedPhraseMetadataArr: Uint8Array[],
   ): Uint8Array[] {
-    const seedPhrases = seedPhraseMetadataArr.map((metadata) => {
-      const serializedMetadata = Buffer.from(metadata).toString('utf-8');
-      const parsedMetadata = JSON.parse(serializedMetadata);
+    const parsedSeedPhraseMetadata = seedPhraseMetadataArr.map((metadata) =>
+      SeedphraseMetadata.fromRawMetadata(metadata),
+    );
 
-      if ('seedPhrase' in parsedMetadata || 'timestamp' in parsedMetadata) {
-        return {
-          seedPhrase: new Uint8Array(
-            Buffer.from(parsedMetadata.seedPhrase, 'base64'),
-          ),
-          timestamp: parsedMetadata.timestamp,
-        };
-      }
+    const seedPhrases = SeedphraseMetadata.sort(parsedSeedPhraseMetadata);
 
-      throw new Error(
-        SeedlessOnboardingControllerError.InvalidSeedPhraseMetadata,
-      );
-    });
-
-    // sort by the timestamp
-    seedPhrases.sort((a, b) => a.timestamp - b.timestamp);
-
-    return seedPhrases.map((phrase) => phrase.seedPhrase);
+    return seedPhrases.map(
+      (seedPhraseMetadata) => seedPhraseMetadata.seedPhrase,
+    );
   }
 
   /**

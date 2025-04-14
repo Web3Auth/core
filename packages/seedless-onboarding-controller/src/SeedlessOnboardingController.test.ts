@@ -8,6 +8,7 @@ import type {
 
 import { SeedlessOnboardingControllerError } from './constants';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
+import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
   SeedlessOnboardingControllerMessenger,
   SeedlessOnboardingControllerOptions,
@@ -652,10 +653,11 @@ describe('SeedlessOnboardingController', () => {
           expect(secretData).toBeDefined();
 
           // `fetchAndRestoreSeedPhraseMetadata` should sort the seed phrases by timestamp and return the seed phrases in the correct order
+          // the seed phrases are sorted in descending order, so the firstly created seed phrase is the latest item in the array
           expect(secretData).toStrictEqual([
-            new Uint8Array(Buffer.from('seedPhrase1', 'utf-8')),
-            new Uint8Array(Buffer.from('seedPhrase2', 'utf-8')),
             new Uint8Array(Buffer.from('seedPhrase3', 'utf-8')),
+            new Uint8Array(Buffer.from('seedPhrase2', 'utf-8')),
+            new Uint8Array(Buffer.from('seedPhrase1', 'utf-8')),
           ]);
 
           // verify the vault data
@@ -994,6 +996,57 @@ describe('SeedlessOnboardingController', () => {
 
           expect(mockSecretDataAdd.isDone()).toBe(true);
         },
+      );
+    });
+  });
+
+  describe('SeedPhraseMetadata', () => {
+    it('should be able to create a seed phrase metadata', () => {
+      const seedPhraseMetadata = new SeedphraseMetadata(MOCK_SEED_PHRASE);
+      expect(seedPhraseMetadata.seedPhrase).toBeDefined();
+      expect(seedPhraseMetadata.timestamp).toBeDefined();
+    });
+
+    it('should be able to serialized and parse a seed phrase metadata', () => {
+      const seedPhraseMetadata = new SeedphraseMetadata(MOCK_SEED_PHRASE);
+      const serializedSeedPhraseBytes = seedPhraseMetadata.toBytes();
+
+      const parsedSeedPhraseMetadata = SeedphraseMetadata.fromRawMetadata(
+        serializedSeedPhraseBytes,
+      );
+      expect(parsedSeedPhraseMetadata.seedPhrase).toBeDefined();
+      expect(parsedSeedPhraseMetadata.timestamp).toBeDefined();
+      expect(parsedSeedPhraseMetadata.seedPhrase).toStrictEqual(
+        MOCK_SEED_PHRASE,
+      );
+    });
+
+    it('should be able to sort seed phrase metadata', () => {
+      const mockSeedPhraseMetadata1 = new SeedphraseMetadata(
+        MOCK_SEED_PHRASE,
+        1000,
+      );
+      const mockSeedPhraseMetadata2 = new SeedphraseMetadata(
+        MOCK_SEED_PHRASE,
+        2000,
+      );
+
+      // sort in ascending order
+      const sortedSeedPhraseMetadata = SeedphraseMetadata.sort(
+        [mockSeedPhraseMetadata1, mockSeedPhraseMetadata2],
+        'asc',
+      );
+      expect(sortedSeedPhraseMetadata[0].timestamp).toBeLessThan(
+        sortedSeedPhraseMetadata[1].timestamp,
+      );
+
+      // sort in descending order
+      const sortedSeedPhraseMetadataDesc = SeedphraseMetadata.sort(
+        [mockSeedPhraseMetadata1, mockSeedPhraseMetadata2],
+        'desc',
+      );
+      expect(sortedSeedPhraseMetadataDesc[0].timestamp).toBeGreaterThan(
+        sortedSeedPhraseMetadataDesc[1].timestamp,
       );
     });
   });
