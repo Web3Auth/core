@@ -7,7 +7,10 @@ import type {
 } from '@metamask/toprf-secure-backup';
 import { base64ToBytes, bytesToBase64, stringToBytes } from '@metamask/utils';
 
-import { SeedlessOnboardingControllerError } from './constants';
+import {
+  EWeb3AuthNetwork,
+  SeedlessOnboardingControllerError,
+} from './constants';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
@@ -96,7 +99,7 @@ async function withController<ReturnValue>(
   const controller = new SeedlessOnboardingController({
     encryptor,
     messenger,
-    network: 'sapphire_devnet',
+    network: EWeb3AuthNetwork.DevNet,
     state: initialState,
     ...rest,
   });
@@ -582,7 +585,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhrase({
+          const secretData = await controller.fetchAllSeedPhrases({
             authConnectionId,
             userId,
             groupedAuthConnectionId,
@@ -636,7 +639,7 @@ describe('SeedlessOnboardingController', () => {
               MOCK_PASSWORD,
             ),
           });
-          const secretData = await controller.fetchAndRestoreSeedPhrase({
+          const secretData = await controller.fetchAllSeedPhrases({
             authConnectionId,
             userId,
             groupedAuthConnectionId,
@@ -687,7 +690,7 @@ describe('SeedlessOnboardingController', () => {
             );
 
           await expect(
-            controller.fetchAndRestoreSeedPhrase({
+            controller.fetchAllSeedPhrases({
               authConnectionId,
               userId,
               groupedAuthConnectionId,
@@ -711,7 +714,7 @@ describe('SeedlessOnboardingController', () => {
             .mockRejectedValueOnce(new Error('Failed to decrypt data'));
 
           await expect(
-            controller.fetchAndRestoreSeedPhrase({
+            controller.fetchAllSeedPhrases({
               authConnectionId,
               userId,
               groupedAuthConnectionId,
@@ -735,7 +738,7 @@ describe('SeedlessOnboardingController', () => {
               stringToBytes(JSON.stringify({ key: 'value' })),
             ]);
           await expect(
-            controller.fetchAndRestoreSeedPhrase({
+            controller.fetchAllSeedPhrases({
               authConnectionId,
               userId,
               groupedAuthConnectionId,
@@ -1039,7 +1042,7 @@ describe('SeedlessOnboardingController', () => {
               data: [],
             },
           });
-          await controller.fetchAndRestoreSeedPhrase({
+          await controller.fetchAllSeedPhrases({
             authConnectionId,
             userId,
             groupedAuthConnectionId,
@@ -1094,7 +1097,7 @@ describe('SeedlessOnboardingController', () => {
             controller.createSeedPhraseBackup({
               verifier: authConnectionId,
               verifierId: userId,
-              // @ts-expect-error we are testing wrong password type
+              // @ts-expect-error Intentionally passing wrong password type
               password: 123,
               seedPhrase: MOCK_SEED_PHRASE,
             }),

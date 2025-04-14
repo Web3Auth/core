@@ -8,7 +8,7 @@ import type { NodeAuthTokens } from '@metamask/toprf-secure-backup';
 import type { Json } from '@metamask/utils';
 import type { MutexInterface } from 'async-mutex';
 
-import type { controllerName } from './constants';
+import type { controllerName, EWeb3AuthNetwork } from './constants';
 
 // State
 export type SeedlessOnboardingControllerState = {
@@ -88,7 +88,7 @@ export type Encryptor = {
 export type SeedlessOnboardingControllerOptions = {
   messenger: SeedlessOnboardingControllerMessenger;
 
-  network?: 'sapphire_mainnet' | 'sapphire_devnet';
+  network?: EWeb3AuthNetwork;
 
   /**
    * @description Initial state to set on this controller.

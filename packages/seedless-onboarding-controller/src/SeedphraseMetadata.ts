@@ -7,6 +7,22 @@ import {
 
 import { SeedlessOnboardingControllerError } from './constants';
 
+type ISeedphraseMetadata = {
+  seedPhrase: Uint8Array;
+  timestamp: number;
+
+  toBytes: () => Uint8Array;
+};
+
+// SeedphraseMetadata type without the seedPhrase and toBytes methods
+// in which the seedPhrase is base64 encoded for more compacted metadata
+type IBase64SeedphraseMetadata = Omit<
+  ISeedphraseMetadata,
+  'seedPhrase' | 'toBytes'
+> & {
+  seedPhrase: string; // base64 encoded string
+};
+
 /**
  * SeedPhraseMetadata is a class that adds metadata to the seed phrase.
  *
@@ -18,7 +34,7 @@ import { SeedlessOnboardingControllerError } from './constants';
  * const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
  * ```
  */
-export class SeedphraseMetadata {
+export class SeedphraseMetadata implements ISeedphraseMetadata {
   readonly #seedPhrase: Uint8Array;
 
   readonly #timestamp: number;
@@ -40,7 +56,9 @@ export class SeedphraseMetadata {
    * @param value - The value to check.
    * @throws If the value is not a valid seed phrase metadata.
    */
-  static assertIsValidSeedPhraseMetadata(value: unknown) {
+  static assertIsBase64SeedphraseMetadata(
+    value: unknown,
+  ): asserts value is IBase64SeedphraseMetadata {
     if (
       typeof value !== 'object' ||
       !value ||
@@ -63,15 +81,11 @@ export class SeedphraseMetadata {
    */
   static fromRawMetadata(rawMetadata: Uint8Array): SeedphraseMetadata {
     const serializedMetadata = bytesToString(rawMetadata);
-    const parsedMetadata = JSON.parse(serializedMetadata) as {
-      seedPhrase: string;
-      timestamp: number;
-    };
+    const parsedMetadata = JSON.parse(serializedMetadata);
 
-    SeedphraseMetadata.assertIsValidSeedPhraseMetadata(parsedMetadata);
+    SeedphraseMetadata.assertIsBase64SeedphraseMetadata(parsedMetadata);
 
     const seedPhraseBytes = base64ToBytes(parsedMetadata.seedPhrase);
-
     return new SeedphraseMetadata(seedPhraseBytes, parsedMetadata.timestamp);
   }
 
@@ -109,12 +123,17 @@ export class SeedphraseMetadata {
    * @returns The serialized SeedPhraseMetadata value in bytes.
    */
   toBytes(): Uint8Array {
+    // encode the raw SeedPhrase to base64 encoded string
+    // to create more compacted metadata
     const b64SeedPhrase = bytesToBase64(this.#seedPhrase);
+
+    // serialize the metadata to a JSON string
     const serializedMetadata = JSON.stringify({
       seedPhrase: b64SeedPhrase,
       timestamp: this.#timestamp,
     });
 
+    // convert the serialized metadata to bytes(Uint8Array)
     return stringToBytes(serializedMetadata);
   }
 }

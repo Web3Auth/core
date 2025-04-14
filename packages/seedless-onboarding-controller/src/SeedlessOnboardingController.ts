@@ -18,7 +18,11 @@ import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import { Mutex } from 'async-mutex';
 import log from 'loglevel';
 
-import { controllerName, SeedlessOnboardingControllerError } from './constants';
+import {
+  controllerName,
+  EWeb3AuthNetwork,
+  SeedlessOnboardingControllerError,
+} from './constants';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
   Encryptor,
@@ -91,7 +95,7 @@ export class SeedlessOnboardingController extends BaseController<
     messenger,
     encryptor,
     state,
-    network,
+    network = EWeb3AuthNetwork.DevNet,
   }: SeedlessOnboardingControllerOptions) {
     super({
       messenger,
@@ -104,7 +108,7 @@ export class SeedlessOnboardingController extends BaseController<
     }
 
     this.toprfClient = new ToprfSecureBackup({
-      network: network || 'sapphire_devnet',
+      network,
     });
   }
 
@@ -223,7 +227,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.password - The password used to create new wallet and seedphrase
    * @returns A promise that resolves to the seed phrase metadata.
    */
-  async fetchAndRestoreSeedPhrase(params: {
+  async fetchAllSeedPhrases(params: {
     authConnectionId: string;
     groupedAuthConnectionId?: string;
     userId: string;
@@ -421,12 +425,14 @@ export class SeedlessOnboardingController extends BaseController<
    * @param seedPhrase - The seed phrase to store.
    * @param encKey - The encryption key to store.
    * @param authKeyPair - The authentication key pair to store.
+   *
+   * @returns A promise that resolves to the success of the operation.
    */
   async #encryptAndStoreSeedPhraseBackup(
     seedPhrase: Uint8Array,
     encKey: Uint8Array,
     authKeyPair: KeyPair,
-  ) {
+  ): Promise<void> {
     const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
     const secretData = seedPhraseMetadata.toBytes();
     await this.toprfClient.addSecretDataItem({
@@ -515,8 +521,8 @@ export class SeedlessOnboardingController extends BaseController<
   }: {
     password: string;
     serializedVaultData: string;
-  }): Promise<boolean> {
-    return this.#withVaultLock(async () => {
+  }): Promise<void> {
+    await this.#withVaultLock(async () => {
       assertIsValidPassword(password);
 
       const updatedState: Partial<SeedlessOnboardingControllerState> = {};
@@ -529,8 +535,6 @@ export class SeedlessOnboardingController extends BaseController<
       this.update((state) => {
         state.vault = updatedState.vault;
       });
-
-      return true;
     });
   }
 
