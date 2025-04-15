@@ -58,11 +58,6 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       persist: true,
       anonymous: false,
     },
-    // TODO: no need to persist this
-    isNewUser: {
-      persist: true,
-      anonymous: false,
-    },
     nodeAuthTokens: {
       persist: false,
       anonymous: true,
@@ -74,9 +69,7 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
 // TODO: what to do when toprfAuthKeyPair expires? - expires when user changes password
 // TODO: support password syncing when available
 
-export const defaultState: SeedlessOnboardingControllerState = {
-  isNewUser: true,
-};
+export const defaultState: SeedlessOnboardingControllerState = {};
 
 export class SeedlessOnboardingController extends BaseController<
   typeof controllerName,
@@ -149,7 +142,6 @@ export class SeedlessOnboardingController extends BaseController<
       });
       this.update((state) => {
         state.nodeAuthTokens = authenticationResult.nodeAuthTokens;
-        state.isNewUser = authenticationResult.isNewUser;
       });
       return authenticationResult;
     } catch (error) {

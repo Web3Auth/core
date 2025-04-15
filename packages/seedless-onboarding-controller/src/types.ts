@@ -22,16 +22,6 @@ export type SeedlessOnboardingControllerState = {
    * This values are used to authenticate users when they go through the Seedless Onboarding flow.
    */
   nodeAuthTokens?: NodeAuthTokens;
-  /**
-   * Indicates whether the user has already fully/partially completed the Seedless Onboarding flow.
-   *
-   * An encryption key is generated from user entered password using Threshold OPRF and the seed phrase is encrypted with the key.
-   * During the Seedless Onboarding Authentication step, TOPRF services check whether user has already generated the encryption key.
-   *
-   * If this value is `false`, we can assume that user already has completed the `SeedPhrase` generation step, and user will have to
-   * fetch the `SeedPhrase` with correct password. Otherwise, users will be asked to set up seedphrase and password, first.
-   */
-  isNewUser?: boolean;
 };
 
 // Actions
