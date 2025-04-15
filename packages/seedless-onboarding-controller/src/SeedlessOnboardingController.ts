@@ -23,6 +23,7 @@ import {
   controllerName,
   EWeb3AuthNetwork,
   SeedlessOnboardingControllerError,
+  RateLimitError,
 } from './constants';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
@@ -401,7 +402,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
     } catch (error) {
       log.error('Error persisting local encryption key', error);
-      throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
+      throw new Error(SeedlessOnboardingControllerError.FailedToPersistOprfKey);
     }
   }
 
@@ -431,11 +432,13 @@ export class SeedlessOnboardingController extends BaseController<
         verifier: params.groupedAuthConnectionId || params.authConnectionId,
         verifierId: params.userId,
       });
-      // TODO: we need info about remaining time to reset the rate limit or account lockout
       return recoverEncKeyResult;
     } catch (error) {
-      log.error('Error recovering encryption key', error);
-      throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
+      const rateLimitError = this.#getRateLimitError(error);
+      if (rateLimitError) {
+        throw rateLimitError;
+      }
+      throw new Error(SeedlessOnboardingControllerError.LoginFailedError);
     }
   }
 
@@ -707,6 +710,24 @@ export class SeedlessOnboardingController extends BaseController<
     ) {
       throw new Error(SeedlessOnboardingControllerError.VaultDataError);
     }
+  }
+
+  #getRateLimitError(error: unknown): RateLimitError | undefined {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof error.code === 'string' &&
+      error.code === 'rate_limit_exceeded' &&
+      'retryAfter' in error &&
+      typeof error.retryAfter === 'number'
+    ) {
+      return new RateLimitError(
+        SeedlessOnboardingControllerError.TooManyLoginAttempts,
+        error.retryAfter,
+      );
+    }
+    return undefined;
   }
 }
 

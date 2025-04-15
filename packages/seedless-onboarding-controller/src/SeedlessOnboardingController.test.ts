@@ -556,7 +556,7 @@ describe('SeedlessOnboardingController', () => {
               password: MOCK_PASSWORD,
             }),
           ).rejects.toThrow(
-            SeedlessOnboardingControllerError.AuthenticationError,
+            SeedlessOnboardingControllerError.FailedToPersistOprfKey,
           );
 
           expect(mockSecretDataAdd.isDone()).toBe(true);
@@ -738,9 +738,7 @@ describe('SeedlessOnboardingController', () => {
               groupedAuthConnectionId,
               password: 'INCORRECT_PASSWORD',
             }),
-          ).rejects.toThrow(
-            SeedlessOnboardingControllerError.AuthenticationError,
-          );
+          ).rejects.toThrow(SeedlessOnboardingControllerError.LoginFailedError);
         },
       );
     });
@@ -789,6 +787,32 @@ describe('SeedlessOnboardingController', () => {
           ).rejects.toThrow(
             SeedlessOnboardingControllerError.InvalidSeedPhraseMetadata,
           );
+        },
+      );
+    });
+
+    it('should handle rate limit error', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS } },
+        async ({ controller, toprfClient }) => {
+          jest.spyOn(toprfClient, 'recoverEncKey').mockRejectedValueOnce({
+            code: 'rate_limit_exceeded',
+            message: 'Rate limit exceeded',
+            name: 'RateLimitError',
+            retryAfter: 10,
+          });
+
+          await expect(
+            controller.fetchAllSeedPhrases({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toMatchObject({
+            message: SeedlessOnboardingControllerError.TooManyLoginAttempts,
+            retryAfter: 10,
+          });
         },
       );
     });
