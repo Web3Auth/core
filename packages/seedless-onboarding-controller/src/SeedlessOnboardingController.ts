@@ -519,8 +519,10 @@ export class SeedlessOnboardingController extends BaseController<
     const { nodeAuthTokens } = this.state;
     this.#assertIsValidNodeAuthTokens(nodeAuthTokens);
 
-    const { toprfEncryptionKey, toprfAuthKeyPair } =
-      await this.#serializeKeyData(rawToprfEncryptionKey, rawToprfAuthKeyPair);
+    const { toprfEncryptionKey, toprfAuthKeyPair } = this.#serializeKeyData(
+      rawToprfEncryptionKey,
+      rawToprfAuthKeyPair,
+    );
 
     const serializedVaultData = JSON.stringify({
       authTokens: nodeAuthTokens,
@@ -579,7 +581,7 @@ export class SeedlessOnboardingController extends BaseController<
   async #withVaultLock<Result>(
     callback: MutuallyExclusiveCallback<Result>,
   ): Promise<Result> {
-    return withLock(this.#vaultOperationMutex, callback);
+    return await withLock(this.#vaultOperationMutex, callback);
   }
 
   /**
@@ -588,13 +590,13 @@ export class SeedlessOnboardingController extends BaseController<
    * @param authKeyPair - The authentication key pair to serialize.
    * @returns The serialized encryption key and authentication key pair.
    */
-  async #serializeKeyData(
+  #serializeKeyData(
     encKey: Uint8Array,
     authKeyPair: KeyPair,
-  ): Promise<{
+  ): {
     toprfEncryptionKey: string;
     toprfAuthKeyPair: string;
-  }> {
+  } {
     const b64EncodedEncKey = bytesToBase64(encKey);
     const b64EncodedAuthKeyPair = JSON.stringify({
       sk: bigIntToHex(authKeyPair.sk), // Convert BigInt to hex string
