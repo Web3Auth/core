@@ -58,6 +58,10 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       persist: true,
       anonymous: false,
     },
+    backupHashes: {
+      persist: true,
+      anonymous: true,
+    },
     nodeAuthTokens: {
       persist: false,
       anonymous: true,
@@ -69,7 +73,9 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
 // TODO: what to do when toprfAuthKeyPair expires? - expires when user changes password
 // TODO: support password syncing when available
 
-export const defaultState: SeedlessOnboardingControllerState = {};
+export const defaultState: SeedlessOnboardingControllerState = {
+  backupHashes: [],
+};
 
 export class SeedlessOnboardingController extends BaseController<
   typeof controllerName,
@@ -248,10 +254,13 @@ export class SeedlessOnboardingController extends BaseController<
       SeedphraseMetadata.fromBatchSeedPhrases(seedPhrases);
 
     // encrypt and store the seed phrase backups
-    await this.toprfClient.batchAddSecretDataItems({
-      secretData: seedPhraseMetadataArr.map((metadata) => metadata.toBytes()),
-      encKey: toprfEncryptionKey,
-      authKeyPair: toprfAuthKeyPair,
+    await this.#withPersistedSeedPhraseBackupsState(async () => {
+      await this.toprfClient.batchAddSecretDataItems({
+        secretData: seedPhraseMetadataArr.map((metadata) => metadata.toBytes()),
+        encKey: toprfEncryptionKey,
+        authKeyPair: toprfAuthKeyPair,
+      });
+      return seedPhrases;
     });
   }
 
@@ -294,8 +303,12 @@ export class SeedlessOnboardingController extends BaseController<
         rawToprfAuthKeyPair: authKeyPair,
       });
     }
-    // TODO: store srp hashes or some identifier for srp in array to see if a srp is part of backup
-    return this.#parseSeedPhraseFromMetadataStore(secretData);
+
+    return this.#withPersistedSeedPhraseBackupsState<Uint8Array[]>(() =>
+      Promise.resolve(
+        SeedphraseMetadata.parseSeedPhrasefromMetadataStore(secretData),
+      ),
+    );
   }
 
   /**
@@ -330,6 +343,20 @@ export class SeedlessOnboardingController extends BaseController<
       password: params.newPassword,
       rawToprfEncryptionKey: newEncKey,
       rawToprfAuthKeyPair: newAuthKeyPair,
+    });
+  }
+
+  /**
+   * @description Get the hash of the seed phrase backup for the given seed phrase, from the state.
+   *
+   * If the given seed phrase is not backed up and not found in the state, it will return `undefined`.
+   *
+   * @param seedPhrase - The seed phrase to get the hash of.
+   * @returns A promise that resolves to the hash of the seed phrase backup.
+   */
+  getSeedPhraseBackupHash(seedPhrase: Uint8Array): string | undefined {
+    return this.state.backupHashes.find((hash) => {
+      return hash === bytesToBase64(keccak256(seedPhrase));
     });
   }
 
@@ -475,10 +502,13 @@ export class SeedlessOnboardingController extends BaseController<
 
     const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
     const secretData = seedPhraseMetadata.toBytes();
-    await this.toprfClient.addSecretDataItem({
-      encKey,
-      secretData,
-      authKeyPair,
+    await this.#withPersistedSeedPhraseBackupsState(async () => {
+      await this.toprfClient.addSecretDataItem({
+        encKey,
+        secretData,
+        authKeyPair,
+      });
+      return seedPhrase;
     });
   }
 
@@ -518,6 +548,46 @@ export class SeedlessOnboardingController extends BaseController<
 
       return { nodeAuthTokens, toprfEncryptionKey, toprfAuthKeyPair };
     });
+  }
+
+  /**
+   * Persist the seed phrase backups state with the hashed seed phrase backups returned from the callback.
+   *
+   * @param callback - The function to execute while the seed phrase backups state is persisted.
+   * @returns A promise that resolves to the success of the operation.
+   */
+  async #withPersistedSeedPhraseBackupsState<
+    Result extends Uint8Array | Uint8Array[],
+  >(callback: () => Promise<Result>): Promise<Result> {
+    try {
+      const backedUpSeedPhrases = await callback();
+      let backedUpHashB64Strings: string[] = [];
+
+      if (Array.isArray(backedUpSeedPhrases)) {
+        backedUpHashB64Strings = backedUpSeedPhrases.map((seedPhrase) =>
+          bytesToBase64(keccak256(seedPhrase)),
+        );
+      } else {
+        backedUpHashB64Strings = [
+          bytesToBase64(keccak256(backedUpSeedPhrases)),
+        ];
+      }
+
+      const existingBackedUpHashes = this.state.backupHashes;
+      const uniqueHashesSet = new Set([
+        ...existingBackedUpHashes,
+        ...backedUpHashB64Strings,
+      ]);
+
+      this.update((state) => {
+        state.backupHashes = Array.from(uniqueHashesSet);
+      });
+
+      return backedUpSeedPhrases;
+    } catch (error) {
+      log.error('Error persisting seed phrase backups', error);
+      throw error;
+    }
   }
 
   /**
@@ -671,26 +741,6 @@ export class SeedlessOnboardingController extends BaseController<
       toprfEncryptionKey: rawToprfEncryptionKey,
       toprfAuthKeyPair: rawToprfAuthKeyPair,
     };
-  }
-
-  /**
-   * Parse the seed phrase metadata from the metadata store.
-   *
-   * @param seedPhraseMetadataArr - The array of SeedPhrase Metadata from the metadata store.
-   * @returns The parsed seed phrase metadata.
-   */
-  #parseSeedPhraseFromMetadataStore(
-    seedPhraseMetadataArr: Uint8Array[],
-  ): Uint8Array[] {
-    const parsedSeedPhraseMetadata = seedPhraseMetadataArr.map((metadata) =>
-      SeedphraseMetadata.fromRawMetadata(metadata),
-    );
-
-    const seedPhrases = SeedphraseMetadata.sort(parsedSeedPhraseMetadata);
-
-    return seedPhrases.map(
-      (seedPhraseMetadata) => seedPhraseMetadata.seedPhrase,
-    );
   }
 
   /**

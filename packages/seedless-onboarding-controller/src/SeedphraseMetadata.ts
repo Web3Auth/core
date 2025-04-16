@@ -95,6 +95,28 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
   }
 
   /**
+   * Parse the seed phrase metadata from the metadata store and return the array of raw seed phrases.
+   *
+   * This method also sorts the seed phrases by timestamp in descending order, i.e. the newest seed phrase will be the first element in the array.
+   *
+   * @param seedPhraseMetadataArr - The array of SeedPhrase Metadata from the metadata store.
+   * @returns The array of raw seed phrases.
+   */
+  static parseSeedPhrasefromMetadataStore(
+    seedPhraseMetadataArr: Uint8Array[],
+  ): Uint8Array[] {
+    const parsedSeedPhraseMetadata = seedPhraseMetadataArr.map((metadata) =>
+      SeedphraseMetadata.fromRawMetadata(metadata),
+    );
+
+    const seedPhrases = SeedphraseMetadata.sort(parsedSeedPhraseMetadata);
+
+    return seedPhrases.map(
+      (seedPhraseMetadata) => seedPhraseMetadata.seedPhrase,
+    );
+  }
+
+  /**
    * Parse and create the SeedPhraseMetadata instance from the raw metadata.
    *
    * @param rawMetadata - The raw metadata.
