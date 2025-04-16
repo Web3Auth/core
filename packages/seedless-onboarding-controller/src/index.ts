@@ -1,3 +1,6 @@
 export * from './SeedlessOnboardingController';
 export type * from './types';
-export { SeedlessOnboardingControllerError } from './constants';
+export {
+  SeedlessOnboardingControllerError,
+  TooManyLoginAttemptsError,
+} from './constants';

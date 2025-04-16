@@ -12,6 +12,7 @@ import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import {
   Web3AuthNetwork,
   SeedlessOnboardingControllerError,
+  TooManyLoginAttemptsError,
 } from './constants';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
@@ -950,7 +951,7 @@ describe('SeedlessOnboardingController', () => {
       );
     });
 
-    it('should handle rate limit error', async () => {
+    it('should handle TooManyLoginAttempts error', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
         async ({ controller, toprfClient }) => {
@@ -971,14 +972,16 @@ describe('SeedlessOnboardingController', () => {
               groupedAuthConnectionId,
               password: MOCK_PASSWORD,
             }),
-          ).rejects.toMatchObject({
-            message: SeedlessOnboardingControllerError.TooManyLoginAttempts,
-            meta: {
-              remainingTime: 10,
-              message: 'Rate limit exceeded',
-              isPermanent: false,
-            },
-          });
+          ).rejects.toStrictEqual(
+            new TooManyLoginAttemptsError(
+              SeedlessOnboardingControllerError.TooManyLoginAttempts,
+              {
+                remainingTime: 10,
+                message: 'Rate limit exceeded',
+                isPermanent: false,
+              },
+            ),
+          );
         },
       );
     });

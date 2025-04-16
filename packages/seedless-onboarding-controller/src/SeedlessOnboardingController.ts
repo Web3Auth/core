@@ -24,7 +24,7 @@ import {
   controllerName,
   Web3AuthNetwork,
   SeedlessOnboardingControllerError,
-  RateLimitError,
+  TooManyLoginAttemptsError,
 } from './constants';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
@@ -477,7 +477,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return recoverEncKeyResult;
     } catch (error) {
-      const rateLimitError = this.#getRateLimitError(error);
+      const rateLimitError = this.#getTooManyLoginAttemtpsError(error);
       if (rateLimitError) {
         throw rateLimitError;
       }
@@ -780,26 +780,39 @@ export class SeedlessOnboardingController extends BaseController<
     }
   }
 
-  #getRateLimitError(error: unknown): RateLimitError | undefined {
+  /**
+   * Check if the provided error is a rate limit error triggered by too many login attempts.
+   *
+   * Return a new TooManyLoginAttemptsError if the error is a rate limit error, otherwise undefined.
+   *
+   * @param error - The error to check.
+   * @returns The rate limit error if the error is a rate limit error, otherwise undefined.
+   */
+  #getTooManyLoginAttemtpsError(
+    error: unknown,
+  ): TooManyLoginAttemptsError | undefined {
     if (
       error instanceof TOPRFError &&
-      typeof error.meta === 'object' &&
-      error.meta !== null &&
-      'rateLimitDetails' in error.meta &&
-      typeof error.meta.rateLimitDetails === 'object' &&
-      error.meta.rateLimitDetails !== null &&
-      'remainingTime' in error.meta.rateLimitDetails &&
-      typeof error.meta.rateLimitDetails.remainingTime === 'number' &&
-      'message' in error.meta.rateLimitDetails &&
-      typeof error.meta.rateLimitDetails.message === 'string' &&
-      'isPermanent' in error.meta.rateLimitDetails &&
-      typeof error.meta.rateLimitDetails.isPermanent === 'boolean'
+      error.meta && // error metadata must be present
+      'rateLimitDetails' in error.meta && // rateLimitDetails must be present
+      typeof error.meta.rateLimitDetails === 'object' && // rateLimitDetails must be an object
+      error.meta.rateLimitDetails !== null && // rateLimitDetails must not be null
+      'remainingTime' in error.meta.rateLimitDetails && // remainingTime must be present
+      typeof error.meta.rateLimitDetails.remainingTime === 'number' && // remainingTime must be a number
+      'message' in error.meta.rateLimitDetails && // message must be present
+      typeof error.meta.rateLimitDetails.message === 'string' && // message must be a string
+      'isPermanent' in error.meta.rateLimitDetails && // isPermanent must be present
+      typeof error.meta.rateLimitDetails.isPermanent === 'boolean' // isPermanent must be a boolean
     ) {
       const { remainingTime, message, isPermanent } =
         error.meta.rateLimitDetails;
-      return new RateLimitError(
+      return new TooManyLoginAttemptsError(
         SeedlessOnboardingControllerError.TooManyLoginAttempts,
-        { remainingTime, message, isPermanent },
+        {
+          remainingTime,
+          message,
+          isPermanent,
+        },
       );
     }
     return undefined;

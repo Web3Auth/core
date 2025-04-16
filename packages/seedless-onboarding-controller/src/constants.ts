@@ -21,11 +21,11 @@ export enum SeedlessOnboardingControllerError {
   InvalidSeedPhraseMetadata = `${controllerName} - Invalid seed phrase metadata`,
 }
 
-export class RateLimitError extends Error {
+export class TooManyLoginAttemptsError extends Error {
   meta: RateLimitErrorData;
 
-  constructor(message: string, meta: RateLimitErrorData) {
+  constructor(message: string, details: RateLimitErrorData) {
     super(message);
-    this.meta = meta;
+    this.meta = details;
   }
 }
