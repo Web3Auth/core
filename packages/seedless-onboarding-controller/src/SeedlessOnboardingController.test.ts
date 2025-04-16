@@ -12,8 +12,8 @@ import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import {
   Web3AuthNetwork,
   SeedlessOnboardingControllerError,
-  TooManyLoginAttemptsError,
 } from './constants';
+import { RecoveryError } from './errors';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
@@ -973,13 +973,58 @@ describe('SeedlessOnboardingController', () => {
               password: MOCK_PASSWORD,
             }),
           ).rejects.toStrictEqual(
-            new TooManyLoginAttemptsError(
-              SeedlessOnboardingControllerError.TooManyLoginAttempts,
-              {
-                remainingTime: 10,
-                message: 'Rate limit exceeded',
-                isPermanent: false,
-              },
+            new RecoveryError('Too many login attempts', {
+              remainingTime: 10,
+              message: 'Rate limit exceeded',
+              isPermanent: false,
+            }),
+          );
+        },
+      );
+    });
+
+    it('should handle IncorrectPassword error', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
+        async ({ controller, toprfClient }) => {
+          jest
+            .spyOn(toprfClient, 'recoverEncKey')
+            .mockRejectedValueOnce(
+              new TOPRFError(1006, 'Could not derive encryption key'),
+            );
+
+          await expect(
+            controller.fetchAllSeedPhrases({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toStrictEqual(new RecoveryError('Incorrect password'));
+        },
+      );
+    });
+
+    it('should handle Unexpected error during key recovery', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
+        async ({ controller, toprfClient }) => {
+          jest
+            .spyOn(toprfClient, 'recoverEncKey')
+            .mockRejectedValueOnce(
+              new TOPRFError(1004, 'Insufficient valid responses'),
+            );
+
+          await expect(
+            controller.fetchAllSeedPhrases({
+              authConnectionId,
+              userId,
+              groupedAuthConnectionId,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toStrictEqual(
+            new RecoveryError(
+              SeedlessOnboardingControllerError.LoginFailedError,
             ),
           );
         },

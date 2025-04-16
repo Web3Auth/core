@@ -5,7 +5,6 @@ import {
   type KeyPair,
   type NodeAuthTokens,
   type SEC1EncodedPublicKey,
-  TOPRFError,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
 import {
@@ -24,8 +23,8 @@ import {
   controllerName,
   Web3AuthNetwork,
   SeedlessOnboardingControllerError,
-  TooManyLoginAttemptsError,
 } from './constants';
+import { RecoveryError } from './errors';
 import { SeedphraseMetadata } from './SeedphraseMetadata';
 import type {
   Encryptor,
@@ -225,7 +224,7 @@ export class SeedlessOnboardingController extends BaseController<
    */
   async addNewSeedPhraseBackup(
     seedPhrase: Uint8Array,
-    password: string,
+    password: string, // TODO: to verify whether we need the password here, check how multi-srp is handled in the keyring first.
   ): Promise<void> {
     // verify the password and unlock the vault
     const { toprfEncryptionKey, toprfAuthKeyPair } =
@@ -458,6 +457,7 @@ export class SeedlessOnboardingController extends BaseController<
    * @param params.userId - user email or id from Social login
    * @param params.password - The password used to derive the encryption key.
    * @returns A promise that resolves to the encryption key and authentication key pair.
+   * @throws RecoveryError - If failed to recover the encryption key.
    */
   async #recoverEncKey(params: {
     authConnectionId: string;
@@ -477,11 +477,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return recoverEncKeyResult;
     } catch (error) {
-      const rateLimitError = this.#getTooManyLoginAttemtpsError(error);
-      if (rateLimitError) {
-        throw rateLimitError;
-      }
-      throw new Error(SeedlessOnboardingControllerError.LoginFailedError);
+      throw RecoveryError.getInstance(error);
     }
   }
 
@@ -520,6 +516,7 @@ export class SeedlessOnboardingController extends BaseController<
    *
    * @param password - The password to verify.
    * @returns A promise that resolves to the decrypted vault data.
+   * @throws If the password is incorrect, throw 'incorrect password' error from the #encryptor.decrypt
    */
   async #verifyPassword(password: string): Promise<{
     nodeAuthTokens: NodeAuthTokens;
@@ -778,44 +775,6 @@ export class SeedlessOnboardingController extends BaseController<
     ) {
       throw new Error(SeedlessOnboardingControllerError.VaultDataError);
     }
-  }
-
-  /**
-   * Check if the provided error is a rate limit error triggered by too many login attempts.
-   *
-   * Return a new TooManyLoginAttemptsError if the error is a rate limit error, otherwise undefined.
-   *
-   * @param error - The error to check.
-   * @returns The rate limit error if the error is a rate limit error, otherwise undefined.
-   */
-  #getTooManyLoginAttemtpsError(
-    error: unknown,
-  ): TooManyLoginAttemptsError | undefined {
-    if (
-      error instanceof TOPRFError &&
-      error.meta && // error metadata must be present
-      'rateLimitDetails' in error.meta && // rateLimitDetails must be present
-      typeof error.meta.rateLimitDetails === 'object' && // rateLimitDetails must be an object
-      error.meta.rateLimitDetails !== null && // rateLimitDetails must not be null
-      'remainingTime' in error.meta.rateLimitDetails && // remainingTime must be present
-      typeof error.meta.rateLimitDetails.remainingTime === 'number' && // remainingTime must be a number
-      'message' in error.meta.rateLimitDetails && // message must be present
-      typeof error.meta.rateLimitDetails.message === 'string' && // message must be a string
-      'isPermanent' in error.meta.rateLimitDetails && // isPermanent must be present
-      typeof error.meta.rateLimitDetails.isPermanent === 'boolean' // isPermanent must be a boolean
-    ) {
-      const { remainingTime, message, isPermanent } =
-        error.meta.rateLimitDetails;
-      return new TooManyLoginAttemptsError(
-        SeedlessOnboardingControllerError.TooManyLoginAttempts,
-        {
-          remainingTime,
-          message,
-          isPermanent,
-        },
-      );
-    }
-    return undefined;
   }
 }
 
