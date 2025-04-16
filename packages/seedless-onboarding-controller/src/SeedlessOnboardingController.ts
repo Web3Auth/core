@@ -1,10 +1,11 @@
 import type { StateMetadata } from '@metamask/base-controller';
 import { BaseController } from '@metamask/base-controller';
 import { encrypt, decrypt } from '@metamask/browser-passworder';
-import type {
-  KeyPair,
-  NodeAuthTokens,
-  SEC1EncodedPublicKey,
+import {
+  type KeyPair,
+  type NodeAuthTokens,
+  type SEC1EncodedPublicKey,
+  TOPRFError,
 } from '@metamask/toprf-secure-backup';
 import { ToprfSecureBackup } from '@metamask/toprf-secure-backup';
 import {
@@ -21,7 +22,7 @@ import log from 'loglevel';
 
 import {
   controllerName,
-  EWeb3AuthNetwork,
+  Web3AuthNetwork,
   SeedlessOnboardingControllerError,
   RateLimitError,
 } from './constants';
@@ -68,7 +69,7 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
     },
   };
 
-// TODO: what to do when nodeAuthTokens are expired? - expires based on login timeout (24 hours)
+// TODO: what to do when nodeAuthTokens are expired? - expires based on login timeout
 // TODO: what to do when toprfEncryptionKey expires? - expires when user changes password
 // TODO: what to do when toprfAuthKeyPair expires? - expires when user changes password
 // TODO: support password syncing when available
@@ -95,7 +96,7 @@ export class SeedlessOnboardingController extends BaseController<
     messenger,
     encryptor,
     state,
-    network = EWeb3AuthNetwork.DevNet,
+    network = Web3AuthNetwork.Devnet,
   }: SeedlessOnboardingControllerOptions) {
     super({
       messenger,
@@ -781,17 +782,24 @@ export class SeedlessOnboardingController extends BaseController<
 
   #getRateLimitError(error: unknown): RateLimitError | undefined {
     if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      typeof error.code === 'string' &&
-      error.code === 'rate_limit_exceeded' &&
-      'retryAfter' in error &&
-      typeof error.retryAfter === 'number'
+      error instanceof TOPRFError &&
+      typeof error.meta === 'object' &&
+      error.meta !== null &&
+      'rateLimitDetails' in error.meta &&
+      typeof error.meta.rateLimitDetails === 'object' &&
+      error.meta.rateLimitDetails !== null &&
+      'remainingTime' in error.meta.rateLimitDetails &&
+      typeof error.meta.rateLimitDetails.remainingTime === 'number' &&
+      'message' in error.meta.rateLimitDetails &&
+      typeof error.meta.rateLimitDetails.message === 'string' &&
+      'isPermanent' in error.meta.rateLimitDetails &&
+      typeof error.meta.rateLimitDetails.isPermanent === 'boolean'
     ) {
+      const { remainingTime, message, isPermanent } =
+        error.meta.rateLimitDetails;
       return new RateLimitError(
         SeedlessOnboardingControllerError.TooManyLoginAttempts,
-        error.retryAfter,
+        { remainingTime, message, isPermanent },
       );
     }
     return undefined;

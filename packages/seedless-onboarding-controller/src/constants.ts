@@ -1,8 +1,10 @@
+import type { RateLimitErrorData } from '@metamask/toprf-secure-backup';
+
 export const controllerName = 'SeedlessOnboardingController';
 
-export enum EWeb3AuthNetwork {
-  MainNet = 'sapphire_mainnet',
-  DevNet = 'sapphire_devnet',
+export enum Web3AuthNetwork {
+  Mainnet = 'sapphire_mainnet',
+  Devnet = 'sapphire_devnet',
 }
 
 export enum SeedlessOnboardingControllerError {
@@ -20,10 +22,10 @@ export enum SeedlessOnboardingControllerError {
 }
 
 export class RateLimitError extends Error {
-  retryAfter: number;
+  meta: RateLimitErrorData;
 
-  constructor(message: string, retryAfter: number) {
+  constructor(message: string, meta: RateLimitErrorData) {
     super(message);
-    this.retryAfter = retryAfter;
+    this.meta = meta;
   }
 }

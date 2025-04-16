@@ -1,15 +1,16 @@
-import type {
-  ChangeEncryptionKeyResult,
-  KeyPair,
-  NodeAuthTokens,
-  RecoverEncryptionKeyResult,
-  ToprfSecureBackup,
+import {
+  TOPRFError,
+  type ChangeEncryptionKeyResult,
+  type KeyPair,
+  type NodeAuthTokens,
+  type RecoverEncryptionKeyResult,
+  type ToprfSecureBackup,
 } from '@metamask/toprf-secure-backup';
 import { base64ToBytes, bytesToBase64, stringToBytes } from '@metamask/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 
 import {
-  EWeb3AuthNetwork,
+  Web3AuthNetwork,
   SeedlessOnboardingControllerError,
 } from './constants';
 import { SeedlessOnboardingController } from './SeedlessOnboardingController';
@@ -104,7 +105,7 @@ async function withController<ReturnValue>(
   const controller = new SeedlessOnboardingController({
     encryptor,
     messenger,
-    network: EWeb3AuthNetwork.DevNet,
+    network: Web3AuthNetwork.Devnet,
     state: initialState,
     ...rest,
   });
@@ -953,12 +954,15 @@ describe('SeedlessOnboardingController', () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
         async ({ controller, toprfClient }) => {
-          jest.spyOn(toprfClient, 'recoverEncKey').mockRejectedValueOnce({
-            code: 'rate_limit_exceeded',
-            message: 'Rate limit exceeded',
-            name: 'RateLimitError',
-            retryAfter: 10,
-          });
+          jest.spyOn(toprfClient, 'recoverEncKey').mockRejectedValueOnce(
+            new TOPRFError(1009, 'Rate limit exceeded', {
+              rateLimitDetails: {
+                remainingTime: 10,
+                message: 'Rate limit exceeded',
+                isPermanent: false,
+              },
+            }),
+          );
 
           await expect(
             controller.fetchAllSeedPhrases({
@@ -969,7 +973,11 @@ describe('SeedlessOnboardingController', () => {
             }),
           ).rejects.toMatchObject({
             message: SeedlessOnboardingControllerError.TooManyLoginAttempts,
-            retryAfter: 10,
+            meta: {
+              remainingTime: 10,
+              message: 'Rate limit exceeded',
+              isPermanent: false,
+            },
           });
         },
       );
