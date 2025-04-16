@@ -51,6 +51,27 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
   }
 
   /**
+   * Create an Array of SeedPhraseMetadata instances from an array of seed phrases.
+   *
+   * To respect the order of the seed phrases, we add the index to the timestamp
+   * so that the first seed phrase backup will have the oldest timestamp
+   * and the last seed phrase backup will have the newest timestamp.
+   *
+   * @param seedPhrases - The seed phrases to add metadata to.
+   * @returns The SeedPhraseMetadata instances.
+   */
+  static fromBatchSeedPhrases(seedPhrases: Uint8Array[]): SeedphraseMetadata[] {
+    const timestamp = Date.now();
+    return seedPhrases.map((seedPhrase, index) => {
+      // To respect the order of the seed phrases, we add the index to the timestamp
+      // so that the first seed phrase backup will have the oldest timestamp
+      // and the last seed phrase backup will have the newest timestamp
+      const backupCreatedAt = timestamp + index * 5;
+      return new SeedphraseMetadata(seedPhrase, backupCreatedAt);
+    });
+  }
+
+  /**
    * Assert that the provided value is a valid seed phrase metadata.
    *
    * @param value - The value to check.

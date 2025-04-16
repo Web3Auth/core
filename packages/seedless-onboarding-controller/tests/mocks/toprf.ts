@@ -31,9 +31,23 @@ export const MOCK_SECRET_DATA_ADD_RESPONSE = {
   message: 'Updated successfully',
 };
 
+export const MOCK_BATCH_SECRET_DATA_ADD_RESPONSE = {
+  success: true,
+  message: 'Updated successfully',
+};
+
 export const MOCK_SECRET_DATA_GET_RESPONSE = {
   success: true,
   data: [],
+};
+
+export const MOCK_ACQUIRE_METADATA_LOCK_RESPONSE = {
+  status: 1,
+  id: 'MOCK_METADATA_LOCK_ID',
+};
+
+export const MOCK_RELEASE_METADATA_LOCK_RESPONSE = {
+  status: 1,
 };
 
 export const MULTIPLE_MOCK_SEEDPHRASE_METADATA = [

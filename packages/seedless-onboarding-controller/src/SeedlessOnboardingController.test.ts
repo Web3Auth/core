@@ -23,6 +23,9 @@ import {
   handleMockSecretDataAdd,
   handleMockCommitment,
   handleMockAuthenticate,
+  handleMockAcquireMetadataLock,
+  handleMockReleaseMetadataLock,
+  handleMockBatchSecretDataAdd,
 } from '../tests/__fixtures__/topfClient';
 import {
   createMockSecretDataGetResponse,
@@ -315,9 +318,7 @@ describe('SeedlessOnboardingController', () => {
         messenger,
       });
       expect(controller).toBeDefined();
-      expect(controller.state).toStrictEqual({
-        isNewUser: true,
-      });
+      expect(controller.state).toStrictEqual({});
     });
 
     it('should be able to instantiate with an encryptor', () => {
@@ -598,6 +599,57 @@ describe('SeedlessOnboardingController', () => {
           );
 
           expect(mockSecretDataAdd.isDone()).toBe(true);
+          expect(controller.state.nodeAuthTokens).toBeDefined();
+          expect(controller.state.nodeAuthTokens).toStrictEqual(
+            MOCK_NODE_AUTH_TOKENS,
+          );
+        },
+      );
+    });
+  });
+
+  describe('batchAddSeedPhraseBackups', () => {
+    const MOCK_PASSWORD = 'mock-password';
+    const SEED_PHRASES = [
+      'new mock seed phrase one',
+      'new mock seed phrase two',
+      'new mock seed phrase three',
+    ];
+    let MOCK_VAULT = '';
+
+    beforeEach(async () => {
+      const mockToprfEncryptor = createMockToprfEncryptor();
+
+      const MOCK_ENCRYPTION_KEY =
+        mockToprfEncryptor.deriveEncKey(MOCK_PASSWORD);
+      const MOCK_AUTH_KEY_PAIR =
+        mockToprfEncryptor.deriveAuthKeyPair(MOCK_PASSWORD);
+
+      MOCK_VAULT = await createMockVault(
+        MOCK_ENCRYPTION_KEY,
+        MOCK_AUTH_KEY_PAIR,
+        MOCK_PASSWORD,
+        MOCK_NODE_AUTH_TOKENS,
+      );
+    });
+
+    it('should be able to add array of seed phrase backups in batch', async () => {
+      await withController(
+        { state: { vault: MOCK_VAULT } },
+        async ({ controller }) => {
+          // mock the network calls
+          const mockAcquireMetadataLock = handleMockAcquireMetadataLock();
+          const mockSecretDataBatchAdd = handleMockBatchSecretDataAdd();
+          const mockReleaseMetadataLock = handleMockReleaseMetadataLock();
+
+          await controller.batchAddSeedPhraseBackups(
+            SEED_PHRASES.map(stringToBytes),
+            MOCK_PASSWORD,
+          );
+
+          expect(mockAcquireMetadataLock.isDone()).toBe(true);
+          expect(mockSecretDataBatchAdd.isDone()).toBe(true);
+          expect(mockReleaseMetadataLock.isDone()).toBe(true);
           expect(controller.state.nodeAuthTokens).toBeDefined();
           expect(controller.state.nodeAuthTokens).toStrictEqual(
             MOCK_NODE_AUTH_TOKENS,
@@ -1193,6 +1245,23 @@ describe('SeedlessOnboardingController', () => {
       expect(seedPhraseMetadata2.seedPhrase).toBeDefined();
       expect(seedPhraseMetadata2.timestamp).toBe(timestamp);
       expect(seedPhraseMetadata2.seedPhrase).toStrictEqual(MOCK_SEED_PHRASE);
+    });
+
+    it('should be able to correctly create `SeedPhraseMetadata` Array for batch seedphrases', () => {
+      const seedPhrases = ['seed phrase 1', 'seed phrase 2', 'seed phrase 3'];
+      const rawSeedPhrases = seedPhrases.map(stringToBytes);
+
+      const seedPhraseMetadataArray =
+        SeedphraseMetadata.fromBatchSeedPhrases(rawSeedPhrases);
+      expect(seedPhraseMetadataArray).toHaveLength(seedPhrases.length);
+
+      // check the timestamp, the first one should be the oldest
+      expect(seedPhraseMetadataArray[0].timestamp).toBeLessThan(
+        seedPhraseMetadataArray[1].timestamp,
+      );
+      expect(seedPhraseMetadataArray[1].timestamp).toBeLessThan(
+        seedPhraseMetadataArray[2].timestamp,
+      );
     });
 
     it('should be able to serialized and parse a seed phrase metadata', () => {

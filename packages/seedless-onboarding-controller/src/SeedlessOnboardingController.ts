@@ -233,6 +233,29 @@ export class SeedlessOnboardingController extends BaseController<
   }
 
   /**
+   * Add array of new seed phrase backups to the metadata store in batch.
+   *
+   * @param seedPhrases - The seed phrases to backup.
+   * @param password - The password used to create new wallet and seedphrase
+   * @returns A promise that resolves to the success of the operation.
+   */
+  async batchAddSeedPhraseBackups(seedPhrases: Uint8Array[], password: string) {
+    const { toprfEncryptionKey, toprfAuthKeyPair } =
+      await this.#verifyPassword(password);
+
+    // prepare seed phrase metadata
+    const seedPhraseMetadataArr =
+      SeedphraseMetadata.fromBatchSeedPhrases(seedPhrases);
+
+    // encrypt and store the seed phrase backups
+    await this.toprfClient.batchAddSecretDataItems({
+      secretData: seedPhraseMetadataArr.map((metadata) => metadata.toBytes()),
+      encKey: toprfEncryptionKey,
+      authKeyPair: toprfAuthKeyPair,
+    });
+  }
+
+  /**
    * @description Fetch seed phrase metadata from the metadata store.
    * @param params - The parameters for fetching seed phrase metadata.
    * @param params.authConnectionId - OAuth authConnectionId from dashboard
