@@ -7,17 +7,16 @@ import {
 
 import { SeedlessOnboardingControllerError } from './constants';
 
-type ISeedphraseMetadata = {
+type ISeedPhraseMetadata = {
   seedPhrase: Uint8Array;
   timestamp: number;
-
   toBytes: () => Uint8Array;
 };
 
-// SeedphraseMetadata type without the seedPhrase and toBytes methods
+// SeedPhraseMetadata type without the seedPhrase and toBytes methods
 // in which the seedPhrase is base64 encoded for more compacted metadata
-type IBase64SeedphraseMetadata = Omit<
-  ISeedphraseMetadata,
+type IBase64SeedPhraseMetadata = Omit<
+  ISeedPhraseMetadata,
   'seedPhrase' | 'toBytes'
 > & {
   seedPhrase: string; // base64 encoded string
@@ -31,10 +30,10 @@ type IBase64SeedphraseMetadata = Omit<
  *
  * @example
  * ```ts
- * const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
+ * const seedPhraseMetadata = new SeedPhraseMetadata(seedPhrase);
  * ```
  */
-export class SeedphraseMetadata implements ISeedphraseMetadata {
+export class SeedPhraseMetadata implements ISeedPhraseMetadata {
   readonly #seedPhrase: Uint8Array;
 
   readonly #timestamp: number;
@@ -60,14 +59,14 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
    * @param seedPhrases - The seed phrases to add metadata to.
    * @returns The SeedPhraseMetadata instances.
    */
-  static fromBatchSeedPhrases(seedPhrases: Uint8Array[]): SeedphraseMetadata[] {
+  static fromBatchSeedPhrases(seedPhrases: Uint8Array[]): SeedPhraseMetadata[] {
     const timestamp = Date.now();
     return seedPhrases.map((seedPhrase, index) => {
       // To respect the order of the seed phrases, we add the index to the timestamp
       // so that the first seed phrase backup will have the oldest timestamp
       // and the last seed phrase backup will have the newest timestamp
       const backupCreatedAt = timestamp + index * 5;
-      return new SeedphraseMetadata(seedPhrase, backupCreatedAt);
+      return new SeedPhraseMetadata(seedPhrase, backupCreatedAt);
     });
   }
 
@@ -79,7 +78,7 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
    */
   static assertIsBase64SeedphraseMetadata(
     value: unknown,
-  ): asserts value is IBase64SeedphraseMetadata {
+  ): asserts value is IBase64SeedPhraseMetadata {
     if (
       typeof value !== 'object' ||
       !value ||
@@ -102,14 +101,14 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
    * @param seedPhraseMetadataArr - The array of SeedPhrase Metadata from the metadata store.
    * @returns The array of raw seed phrases.
    */
-  static parseSeedPhrasefromMetadataStore(
+  static parseSeedPhraseFromMetadataStore(
     seedPhraseMetadataArr: Uint8Array[],
   ): Uint8Array[] {
     const parsedSeedPhraseMetadata = seedPhraseMetadataArr.map((metadata) =>
-      SeedphraseMetadata.fromRawMetadata(metadata),
+      SeedPhraseMetadata.fromRawMetadata(metadata),
     );
 
-    const seedPhrases = SeedphraseMetadata.sort(parsedSeedPhraseMetadata);
+    const seedPhrases = SeedPhraseMetadata.sort(parsedSeedPhraseMetadata);
 
     return seedPhrases.map(
       (seedPhraseMetadata) => seedPhraseMetadata.seedPhrase,
@@ -122,14 +121,14 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
    * @param rawMetadata - The raw metadata.
    * @returns The parsed seed phrase metadata.
    */
-  static fromRawMetadata(rawMetadata: Uint8Array): SeedphraseMetadata {
+  static fromRawMetadata(rawMetadata: Uint8Array): SeedPhraseMetadata {
     const serializedMetadata = bytesToString(rawMetadata);
     const parsedMetadata = JSON.parse(serializedMetadata);
 
-    SeedphraseMetadata.assertIsBase64SeedphraseMetadata(parsedMetadata);
+    SeedPhraseMetadata.assertIsBase64SeedphraseMetadata(parsedMetadata);
 
     const seedPhraseBytes = base64ToBytes(parsedMetadata.seedPhrase);
-    return new SeedphraseMetadata(seedPhraseBytes, parsedMetadata.timestamp);
+    return new SeedPhraseMetadata(seedPhraseBytes, parsedMetadata.timestamp);
   }
 
   /**
@@ -141,9 +140,9 @@ export class SeedphraseMetadata implements ISeedphraseMetadata {
    * @returns The sorted seed phrases.
    */
   static sort(
-    seedPhrases: SeedphraseMetadata[],
+    seedPhrases: SeedPhraseMetadata[],
     order: 'asc' | 'desc' = 'desc',
-  ): SeedphraseMetadata[] {
+  ): SeedPhraseMetadata[] {
     return seedPhrases.sort((a, b) => {
       if (order === 'asc') {
         return a.timestamp - b.timestamp;
