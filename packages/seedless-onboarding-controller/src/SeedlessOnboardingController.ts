@@ -25,7 +25,7 @@ import {
   SeedlessOnboardingControllerError,
 } from './constants';
 import { RecoveryError } from './errors';
-import { SeedphraseMetadata } from './SeedphraseMetadata';
+import { SeedPhraseMetadata } from './SeedPhraseMetadata';
 import type {
   Encryptor,
   MutuallyExclusiveCallback,
@@ -251,17 +251,26 @@ export class SeedlessOnboardingController extends BaseController<
 
     // prepare seed phrase metadata
     const seedPhraseMetadataArr =
-      SeedphraseMetadata.fromBatchSeedPhrases(seedPhrases);
+      SeedPhraseMetadata.fromBatchSeedPhrases(seedPhrases);
 
-    // encrypt and store the seed phrase backups
-    await this.#withPersistedSeedPhraseBackupsState(async () => {
-      await this.toprfClient.batchAddSecretDataItems({
-        secretData: seedPhraseMetadataArr.map((metadata) => metadata.toBytes()),
-        encKey: toprfEncryptionKey,
-        authKeyPair: toprfAuthKeyPair,
+    try {
+      // encrypt and store the seed phrase backups
+      await this.#withPersistedSeedPhraseBackupsState(async () => {
+        await this.toprfClient.batchAddSecretDataItems({
+          secretData: seedPhraseMetadataArr.map((metadata) =>
+            metadata.toBytes(),
+          ),
+          encKey: toprfEncryptionKey,
+          authKeyPair: toprfAuthKeyPair,
+        });
+        return seedPhrases;
       });
-      return seedPhrases;
-    });
+    } catch (error) {
+      log.error('Error encrypting and storing seed phrase backups', error);
+      throw new Error(
+        SeedlessOnboardingControllerError.FailedToEncryptAndStoreSeedPhraseBackup,
+      );
+    }
   }
 
   /**
@@ -291,29 +300,31 @@ export class SeedlessOnboardingController extends BaseController<
       password,
     });
 
-    let secretData: Uint8Array[];
     try {
-      secretData = await this.toprfClient.fetchAllSecretDataItems({
+      const secretData = await this.toprfClient.fetchAllSecretDataItems({
         decKey: encKey,
         authKeyPair,
       });
-    } catch {
-      throw new Error(SeedlessOnboardingControllerError.FailedToFetchBackup);
-    }
 
-    if (secretData.length > 0) {
-      await this.#createNewVaultWithAuthData({
-        password,
-        rawToprfEncryptionKey: encKey,
-        rawToprfAuthKeyPair: authKeyPair,
-      });
-    }
+      if (secretData?.length > 0) {
+        await this.#createNewVaultWithAuthData({
+          password,
+          rawToprfEncryptionKey: encKey,
+          rawToprfAuthKeyPair: authKeyPair,
+        });
+      }
 
-    return this.#withPersistedSeedPhraseBackupsState<Uint8Array[]>(() =>
-      Promise.resolve(
-        SeedphraseMetadata.parseSeedPhrasefromMetadataStore(secretData),
-      ),
-    );
+      return this.#withPersistedSeedPhraseBackupsState<Uint8Array[]>(() =>
+        Promise.resolve(
+          SeedPhraseMetadata.parseSeedPhraseFromMetadataStore(secretData),
+        ),
+      );
+    } catch (error) {
+      log.error('Error fetching seed phrase metadata', error);
+      throw new Error(
+        SeedlessOnboardingControllerError.FailedToFetchSeedPhraseMetadata,
+      );
+    }
   }
 
   /**
@@ -339,16 +350,21 @@ export class SeedlessOnboardingController extends BaseController<
     // verify the old password of the encrypted vault
     await this.#verifyPassword(params.oldPassword);
 
-    // update the encryption key with new password and update the Metadata Store
-    const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
-      await this.#changeEncryptionKey(params);
+    try {
+      // update the encryption key with new password and update the Metadata Store
+      const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
+        await this.#changeEncryptionKey(params);
 
-    // update and encrypt the vault with new password
-    await this.#createNewVaultWithAuthData({
-      password: params.newPassword,
-      rawToprfEncryptionKey: newEncKey,
-      rawToprfAuthKeyPair: newAuthKeyPair,
-    });
+      // update and encrypt the vault with new password
+      await this.#createNewVaultWithAuthData({
+        password: params.newPassword,
+        rawToprfEncryptionKey: newEncKey,
+        rawToprfAuthKeyPair: newAuthKeyPair,
+      });
+    } catch (error) {
+      log.error('Error changing password', error);
+      throw new Error(SeedlessOnboardingControllerError.FailedToChangePassword);
+    }
   }
 
   /**
@@ -503,7 +519,7 @@ export class SeedlessOnboardingController extends BaseController<
     this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
     try {
-      const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
+      const seedPhraseMetadata = new SeedPhraseMetadata(seedPhrase);
       const secretData = seedPhraseMetadata.toBytes();
       await this.#withPersistedSeedPhraseBackupsState(async () => {
         await this.toprfClient.addSecretDataItem({
@@ -513,8 +529,11 @@ export class SeedlessOnboardingController extends BaseController<
         });
         return seedPhrase;
       });
-    } catch {
-      throw new Error(SeedlessOnboardingControllerError.FailedToCreateBackup);
+    } catch (error) {
+      log.error('Error encrypting and storing seed phrase backup', error);
+      throw new Error(
+        SeedlessOnboardingControllerError.FailedToEncryptAndStoreSeedPhraseBackup,
+      );
     }
   }
 
