@@ -19,9 +19,9 @@ function getErrorMessageFromTOPRFErrorCode(
 ): string {
   switch (errorCode) {
     case TORPFErrorCode.RateLimitExceeded:
-      return 'Too many login attempts';
+      return SeedlessOnboardingControllerError.TooManyLoginAttempts;
     case TORPFErrorCode.CouldNotDeriveEncryptionKey:
-      return 'Incorrect password';
+      return SeedlessOnboardingControllerError.IncorrectPassword;
     default:
       return defaultMessage;
   }

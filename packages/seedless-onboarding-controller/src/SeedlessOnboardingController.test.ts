@@ -535,7 +535,9 @@ describe('SeedlessOnboardingController', () => {
             seedPhrase: MOCK_SEED_PHRASE,
             password: MOCK_PASSWORD,
           }),
-        ).rejects.toThrow(SeedlessOnboardingControllerError.NoOAuthIdToken);
+        ).rejects.toThrow(
+          SeedlessOnboardingControllerError.InsufficientAuthToken,
+        );
 
         // verify vault is not created
         expect(controller.state.vault).toBe(initialState.vault);
@@ -567,6 +569,32 @@ describe('SeedlessOnboardingController', () => {
           );
 
           expect(mockSecretDataAdd.isDone()).toBe(true);
+        },
+      );
+    });
+
+    it('should throw an error if failed to create seedphrase backup', async () => {
+      await withController(
+        { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
+        async ({ controller, toprfClient }) => {
+          mockCreateLocalEncKey(toprfClient, MOCK_PASSWORD);
+
+          jest.spyOn(toprfClient, 'persistOprfKey').mockResolvedValueOnce();
+
+          jest
+            .spyOn(toprfClient, 'addSecretDataItem')
+            .mockRejectedValueOnce(new Error('Failed to add secret data item'));
+
+          await expect(
+            controller.createToprfKeyAndBackupSeedPhrase({
+              authConnectionId,
+              userId,
+              seedPhrase: MOCK_SEED_PHRASE,
+              password: MOCK_PASSWORD,
+            }),
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.FailedToCreateBackup,
+          );
         },
       );
     });
@@ -903,7 +931,7 @@ describe('SeedlessOnboardingController', () => {
       );
     });
 
-    it('should throw an error if incorrect password is provided', async () => {
+    it('should throw an error if failed to decrypt the SeedPhraseBackup data', async () => {
       await withController(
         { state: { nodeAuthTokens: MOCK_NODE_AUTH_TOKENS, backupHashes: [] } },
         async ({ controller, toprfClient }) => {
@@ -920,7 +948,9 @@ describe('SeedlessOnboardingController', () => {
               groupedAuthConnectionId,
               password: 'INCORRECT_PASSWORD',
             }),
-          ).rejects.toThrow('Failed to decrypt data');
+          ).rejects.toThrow(
+            SeedlessOnboardingControllerError.FailedToFetchBackup,
+          );
         },
       );
     });
@@ -973,11 +1003,14 @@ describe('SeedlessOnboardingController', () => {
               password: MOCK_PASSWORD,
             }),
           ).rejects.toStrictEqual(
-            new RecoveryError('Too many login attempts', {
-              remainingTime: 10,
-              message: 'Rate limit exceeded',
-              isPermanent: false,
-            }),
+            new RecoveryError(
+              SeedlessOnboardingControllerError.TooManyLoginAttempts,
+              {
+                remainingTime: 10,
+                message: 'Rate limit exceeded',
+                isPermanent: false,
+              },
+            ),
           );
         },
       );
@@ -1000,7 +1033,11 @@ describe('SeedlessOnboardingController', () => {
               groupedAuthConnectionId,
               password: MOCK_PASSWORD,
             }),
-          ).rejects.toStrictEqual(new RecoveryError('Incorrect password'));
+          ).rejects.toStrictEqual(
+            new RecoveryError(
+              SeedlessOnboardingControllerError.IncorrectPassword,
+            ),
+          );
         },
       );
     });

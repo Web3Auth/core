@@ -291,12 +291,17 @@ export class SeedlessOnboardingController extends BaseController<
       password,
     });
 
-    const secretData = await this.toprfClient.fetchAllSecretDataItems({
-      decKey: encKey,
-      authKeyPair,
-    });
+    let secretData: Uint8Array[];
+    try {
+      secretData = await this.toprfClient.fetchAllSecretDataItems({
+        decKey: encKey,
+        authKeyPair,
+      });
+    } catch {
+      throw new Error(SeedlessOnboardingControllerError.FailedToFetchBackup);
+    }
 
-    if (secretData?.length > 0) {
+    if (secretData.length > 0) {
       await this.#createNewVaultWithAuthData({
         password,
         rawToprfEncryptionKey: encKey,
@@ -497,16 +502,20 @@ export class SeedlessOnboardingController extends BaseController<
   ): Promise<void> {
     this.#assertIsValidNodeAuthTokens(this.state.nodeAuthTokens);
 
-    const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
-    const secretData = seedPhraseMetadata.toBytes();
-    await this.#withPersistedSeedPhraseBackupsState(async () => {
-      await this.toprfClient.addSecretDataItem({
-        encKey,
-        secretData,
-        authKeyPair,
+    try {
+      const seedPhraseMetadata = new SeedphraseMetadata(seedPhrase);
+      const secretData = seedPhraseMetadata.toBytes();
+      await this.#withPersistedSeedPhraseBackupsState(async () => {
+        await this.toprfClient.addSecretDataItem({
+          encKey,
+          secretData,
+          authKeyPair,
+        });
+        return seedPhrase;
       });
-      return seedPhrase;
-    });
+    } catch {
+      throw new Error(SeedlessOnboardingControllerError.FailedToCreateBackup);
+    }
   }
 
   /**
@@ -751,7 +760,7 @@ export class SeedlessOnboardingController extends BaseController<
     value: unknown,
   ): asserts value is NodeAuthTokens {
     if (!Array.isArray(value) || value.length === 0) {
-      throw new Error(SeedlessOnboardingControllerError.NoOAuthIdToken);
+      throw new Error(SeedlessOnboardingControllerError.InsufficientAuthToken);
     }
   }
 
