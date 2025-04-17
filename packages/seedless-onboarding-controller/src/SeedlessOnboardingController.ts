@@ -17,7 +17,6 @@ import {
 } from '@metamask/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import { Mutex } from 'async-mutex';
-import log from 'loglevel';
 
 import {
   controllerName,
@@ -25,6 +24,7 @@ import {
   SeedlessOnboardingControllerError,
 } from './constants';
 import { RecoveryError } from './errors';
+import { projectLogger, createModuleLogger } from './logger';
 import { SeedPhraseMetadata } from './SeedPhraseMetadata';
 import type {
   Encryptor,
@@ -34,6 +34,9 @@ import type {
   SeedlessOnboardingControllerState,
   VaultData,
 } from './types';
+
+const log = createModuleLogger(projectLogger, controllerName);
+
 /**
  * toprf flow
  * what data are we storing and where
@@ -151,7 +154,7 @@ export class SeedlessOnboardingController extends BaseController<
       });
       return authenticationResult;
     } catch (error) {
-      log.error('Error authenticating user', error);
+      log('Error authenticating user', error);
       throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
     }
   }
@@ -266,7 +269,7 @@ export class SeedlessOnboardingController extends BaseController<
         return seedPhrases;
       });
     } catch (error) {
-      log.error('Error encrypting and storing seed phrase backups', error);
+      log('Error encrypting and storing seed phrase backups', error);
       throw new Error(
         SeedlessOnboardingControllerError.FailedToEncryptAndStoreSeedPhraseBackup,
       );
@@ -320,7 +323,7 @@ export class SeedlessOnboardingController extends BaseController<
         ),
       );
     } catch (error) {
-      log.error('Error fetching seed phrase metadata', error);
+      log('Error fetching seed phrase metadata', error);
       throw new Error(
         SeedlessOnboardingControllerError.FailedToFetchSeedPhraseMetadata,
       );
@@ -362,7 +365,7 @@ export class SeedlessOnboardingController extends BaseController<
         rawToprfAuthKeyPair: newAuthKeyPair,
       });
     } catch (error) {
-      log.error('Error changing password', error);
+      log('Error changing password', error);
       throw new Error(SeedlessOnboardingControllerError.FailedToChangePassword);
     }
   }
@@ -464,7 +467,7 @@ export class SeedlessOnboardingController extends BaseController<
         authPubKey: params.authPubKey,
       });
     } catch (error) {
-      log.error('Error persisting local encryption key', error);
+      log('Error persisting local encryption key', error);
       throw new Error(SeedlessOnboardingControllerError.FailedToPersistOprfKey);
     }
   }
@@ -530,7 +533,7 @@ export class SeedlessOnboardingController extends BaseController<
         return seedPhrase;
       });
     } catch (error) {
-      log.error('Error encrypting and storing seed phrase backup', error);
+      log('Error encrypting and storing seed phrase backup', error);
       throw new Error(
         SeedlessOnboardingControllerError.FailedToEncryptAndStoreSeedPhraseBackup,
       );
@@ -611,7 +614,7 @@ export class SeedlessOnboardingController extends BaseController<
 
       return backedUpSeedPhrases;
     } catch (error) {
-      log.error('Error persisting seed phrase backups', error);
+      log('Error persisting seed phrase backups', error);
       throw error;
     }
   }
