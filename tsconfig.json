@@ -45,6 +45,7 @@
     { "path": "./packages/queued-request-controller" },
     { "path": "./packages/rate-limit-controller" },
     { "path": "./packages/remote-feature-flag-controller" },
+    { "path": "./packages/seedless-onboarding-controller" },
     { "path": "./packages/sample-controllers" },
     { "path": "./packages/selected-network-controller" },
     { "path": "./packages/signature-controller" },
