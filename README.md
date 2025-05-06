@@ -61,6 +61,7 @@ Each package in this repository has its own README where you can find installati
 - [`@metamask/remote-feature-flag-controller`](packages/remote-feature-flag-controller)
 - [`@metamask/seedless-onboarding-controller`](packages/seedless-onboarding-controller)
 - [`@metamask/sample-controllers`](packages/sample-controllers)
+- [`@metamask/seedless-onboarding-controller`](packages/seedless-onboarding-controller)
 - [`@metamask/selected-network-controller`](packages/selected-network-controller)
 - [`@metamask/signature-controller`](packages/signature-controller)
 - [`@metamask/token-search-discovery-controller`](packages/token-search-discovery-controller)
@@ -116,6 +117,7 @@ linkStyle default opacity:0.5
   remote_feature_flag_controller(["@metamask/remote-feature-flag-controller"]);
   seedless_onboarding_controller(["@metamask/seedless-onboarding-controller"]);
   sample_controllers(["@metamask/sample-controllers"]);
+  seedless_onboarding_controller(["@metamask/seedless-onboarding-controller"]);
   selected_network_controller(["@metamask/selected-network-controller"]);
   signature_controller(["@metamask/signature-controller"]);
   token_search_discovery_controller(["@metamask/token-search-discovery-controller"]);
@@ -141,6 +143,7 @@ linkStyle default opacity:0.5
   base_controller --> json_rpc_engine;
   bridge_controller --> base_controller;
   bridge_controller --> controller_utils;
+  bridge_controller --> multichain_network_controller;
   bridge_controller --> polling_controller;
   bridge_controller --> accounts_controller;
   bridge_controller --> eth_json_rpc_provider;
@@ -162,6 +165,7 @@ linkStyle default opacity:0.5
   earn_controller --> controller_utils;
   earn_controller --> accounts_controller;
   earn_controller --> network_controller;
+  earn_controller --> transaction_controller;
   eip1193_permission_middleware --> chain_agnostic_permission;
   eip1193_permission_middleware --> controller_utils;
   eip1193_permission_middleware --> json_rpc_engine;

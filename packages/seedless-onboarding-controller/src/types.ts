@@ -1,70 +1,106 @@
-import type {
-  ControllerGetStateAction,
-  ControllerStateChangeEvent,
-  RestrictedMessenger,
-} from '@metamask/base-controller';
-import type { KeyringControllerStateChangeEvent } from '@metamask/keyring-controller';
+import type { RestrictedMessenger } from '@metamask/base-controller';
+import type { ControllerGetStateAction } from '@metamask/base-controller';
+import type { ControllerStateChangeEvent } from '@metamask/base-controller';
 import type { NodeAuthTokens } from '@metamask/toprf-secure-backup';
 import type { Json } from '@metamask/utils';
 import type { MutexInterface } from 'async-mutex';
 
-import type { controllerName, Web3AuthNetwork } from './constants';
+import type {
+  AuthConnection,
+  controllerName,
+  Web3AuthNetwork,
+} from './constants';
 
-// State
-export type SeedlessOnboardingControllerState = {
+export type SocialBackupsMetadata = {
+  id: string;
+  hash: string;
+};
+
+export type AuthenticatedUserDetails = {
   /**
-   * Encrypted array of serialized keyrings data.
+   * Type of social login provider.
    */
-  vault?: string;
+  authConnection: AuthConnection;
 
   /**
    * The node auth tokens from OAuth User authentication after the Social login.
    *
    * This values are used to authenticate users when they go through the Seedless Onboarding flow.
    */
-  nodeAuthTokens?: NodeAuthTokens;
+  nodeAuthTokens: NodeAuthTokens;
 
   /**
-   * The hashes of the seed phrase backups.
-   *
-   * This is to facilitate the UI to display backup status of the seed phrases.
+   * OAuth connection id from web3auth dashboard.
    */
-  backupHashes: string[];
+  authConnectionId: string;
+
+  /**
+   * The optional grouped authConnectionId to authenticate the user with Web3Auth network.
+   */
+  groupedAuthConnectionId?: string;
+
+  /**
+   * The user email or ID from Social login.
+   */
+  userId: string;
+
+  /**
+   * The user email from Social login.
+   */
+  socialLoginEmail: string;
 };
 
+// State
+export type SeedlessOnboardingControllerState =
+  Partial<AuthenticatedUserDetails> & {
+    /**
+     * Encrypted array of serialized keyrings data.
+     */
+    vault?: string;
+
+    /**
+     * The hashes of the seed phrase backups.
+     *
+     * This is to facilitate the UI to display backup status of the seed phrases.
+     */
+    socialBackupsMetadata: SocialBackupsMetadata[];
+  };
+
 // Actions
-export type SeedlessOnboardingControllerGetStateActions =
+export type SeedlessOnboardingControllerGetStateAction =
   ControllerGetStateAction<
     typeof controllerName,
     SeedlessOnboardingControllerState
   >;
+export type SeedlessOnboardingControllerActions =
+  SeedlessOnboardingControllerGetStateAction;
 
-export type AllowedActions = SeedlessOnboardingControllerGetStateActions;
+export type AllowedActions = never;
 
+// Events
 export type SeedlessOnboardingControllerStateChangeEvent =
   ControllerStateChangeEvent<
     typeof controllerName,
     SeedlessOnboardingControllerState
   >;
+export type SeedlessOnboardingControllerEvents =
+  SeedlessOnboardingControllerStateChangeEvent;
 
-// events allowed to be subscribed
-export type AllowedEvents =
-  | KeyringControllerStateChangeEvent
-  | SeedlessOnboardingControllerStateChangeEvent;
+export type AllowedEvents = never;
 
 // Messenger
 export type SeedlessOnboardingControllerMessenger = RestrictedMessenger<
   typeof controllerName,
-  AllowedActions,
-  AllowedEvents,
+  SeedlessOnboardingControllerActions | AllowedActions,
+  SeedlessOnboardingControllerEvents | AllowedEvents,
   AllowedActions['type'],
   AllowedEvents['type']
 >;
 
 /**
- * @description Encryptor interface for encrypting and decrypting seedless onboarding vault.
+ * Encryptor interface for encrypting and decrypting seedless onboarding vault.
  */
-export type Encryptor = {
+export type VaultEncryptor = {
   /**
    * Encrypts the given object with the given password.
    *
@@ -83,21 +119,34 @@ export type Encryptor = {
   decrypt: (password: string, encryptedString: string) => Promise<unknown>;
 };
 
+/**
+ * Seedless Onboarding Controller Options.
+ *
+ * @param messenger - The messenger to use for this controller.
+ * @param state - The initial state to set on this controller.
+ * @param encryptor - The encryptor to use for encrypting and decrypting seedless onboarding vault.
+ */
 export type SeedlessOnboardingControllerOptions = {
   messenger: SeedlessOnboardingControllerMessenger;
 
+  /**
+   * Initial state to set on this controller.
+   */
+  state?: Partial<SeedlessOnboardingControllerState>;
+
+  /**
+   * Encryptor to use for encrypting and decrypting seedless onboarding vault.
+   *
+   * @default browser-passworder @link https://github.com/MetaMask/browser-passworder
+   */
+  encryptor?: VaultEncryptor;
+
+  /**
+   * Type of Web3Auth network to be used for the Seedless Onboarding flow.
+   *
+   * @default Web3AuthNetwork.Mainnet
+   */
   network?: Web3AuthNetwork;
-
-  /**
-   * @description Initial state to set on this controller.
-   */
-  state?: SeedlessOnboardingControllerState;
-
-  /**
-   * @description Encryptor used for encryption and decryption of data.
-   * @default WebCryptoAPI
-   */
-  encryptor?: Encryptor;
 };
 
 /**
@@ -113,7 +162,7 @@ export type MutuallyExclusiveCallback<Result> = ({
 }) => Promise<Result>;
 
 /**
- * @description The structure of the data which is serialized and stored in the vault.
+ * The structure of the data which is serialized and stored in the vault.
  */
 export type VaultData = {
   /**

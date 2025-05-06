@@ -1,6 +1,6 @@
 # `@metamask/seedless-onboarding-controller`
 
-Manage back up and restore of user SRP
+Backup and rehydrate SRP(s) using social login and password
 
 ## Installation
 

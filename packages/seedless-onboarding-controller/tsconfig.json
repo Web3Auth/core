@@ -9,9 +9,6 @@
     },
     {
       "path": "../message-manager"
-    },
-    {
-      "path": "../keyring-controller"
     }
   ],
   "include": ["../../types", "./src", "./tests"]
