@@ -14,16 +14,18 @@ import {
   remove0x,
   bigIntToHex,
 } from '@metamask/utils';
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { Mutex } from 'async-mutex';
 
 import {
   type AuthConnection,
   controllerName,
+  PASSWORD_OUTDATED_CACHE_TTL_MS,
   SecretType,
   SeedlessOnboardingControllerError,
   Web3AuthNetwork,
 } from './constants';
-import { RecoveryError } from './errors';
+import { PasswordSyncError, RecoveryError } from './errors';
 import { projectLogger, createModuleLogger } from './logger';
 import { SecretMetadata } from './SecretMetadata';
 import type {
@@ -34,6 +36,7 @@ import type {
   VaultData,
   AuthenticatedUserDetails,
   SocialBackupsMetadata,
+  SRPBackedUpUserDetails,
   VaultEncryptor,
 } from './types';
 
@@ -68,7 +71,7 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       anonymous: true,
     },
     nodeAuthTokens: {
-      persist: false,
+      persist: true,
       anonymous: true,
     },
     authConnection: {
@@ -99,6 +102,14 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       persist: false,
       anonymous: true,
     },
+    authPubKey: {
+      persist: true,
+      anonymous: true,
+    },
+    passwordOutdatedCache: {
+      persist: true,
+      anonymous: true,
+    },
   };
 
 export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
@@ -107,6 +118,8 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
   SeedlessOnboardingControllerMessenger
 > {
   readonly #vaultEncryptor: VaultEncryptor<EncryptionKey>;
+
+  readonly #controllerOperationMutex = new Mutex();
 
   readonly #vaultOperationMutex = new Mutex();
 
@@ -181,41 +194,43 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     groupedAuthConnectionId?: string;
     socialLoginEmail?: string;
   }) {
-    try {
-      const {
-        idTokens,
-        authConnectionId,
-        groupedAuthConnectionId,
-        userId,
-        authConnection,
-        socialLoginEmail,
-      } = params;
-      const hashedIdTokenHexes = idTokens.map((idToken) => {
-        return remove0x(keccak256AndHexify(stringToBytes(idToken)));
-      });
-      const authenticationResult = await this.toprfClient.authenticate({
-        authConnectionId: groupedAuthConnectionId || authConnectionId,
-        userId,
-        idTokens: hashedIdTokenHexes,
-        groupedAuthConnectionParams: {
-          authConnectionId,
+    return await this.#withControllerLock(async () => {
+      try {
+        const {
           idTokens,
-        },
-      });
-      // update the state with the authenticated user info
-      this.update((state) => {
-        state.nodeAuthTokens = authenticationResult.nodeAuthTokens;
-        state.authConnectionId = authConnectionId;
-        state.groupedAuthConnectionId = groupedAuthConnectionId;
-        state.userId = userId;
-        state.authConnection = authConnection;
-        state.socialLoginEmail = socialLoginEmail;
-      });
-      return authenticationResult;
-    } catch (error) {
-      log('Error authenticating user', error);
-      throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
-    }
+          authConnectionId,
+          groupedAuthConnectionId,
+          userId,
+          authConnection,
+          socialLoginEmail,
+        } = params;
+        const hashedIdTokenHexes = idTokens.map((idToken) => {
+          return remove0x(keccak256AndHexify(stringToBytes(idToken)));
+        });
+        const authenticationResult = await this.toprfClient.authenticate({
+          authConnectionId: groupedAuthConnectionId || authConnectionId,
+          userId,
+          idTokens: hashedIdTokenHexes,
+          groupedAuthConnectionParams: {
+            authConnectionId,
+            idTokens,
+          },
+        });
+        // update the state with the authenticated user info
+        this.update((state) => {
+          state.nodeAuthTokens = authenticationResult.nodeAuthTokens;
+          state.authConnectionId = authConnectionId;
+          state.groupedAuthConnectionId = groupedAuthConnectionId;
+          state.userId = userId;
+          state.authConnection = authConnection;
+          state.socialLoginEmail = socialLoginEmail;
+        });
+        return authenticationResult;
+      } catch (error) {
+        log('Error authenticating user', error);
+        throw new Error(SeedlessOnboardingControllerError.AuthenticationError);
+      }
+    });
   }
 
   /**
@@ -235,29 +250,34 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     // assert that the user is authenticated before creating the TOPRF key and backing up the seed phrase
     this.#assertIsAuthenticatedUser(this.state);
 
-    // locally evaluate the encryption key from the password
-    const { encKey, authKeyPair, oprfKey } = this.toprfClient.createLocalKey({
-      password,
-    });
+    return await this.#withControllerLock(async () => {
+      // locally evaluate the encryption key from the password
+      const { encKey, authKeyPair, oprfKey } = this.toprfClient.createLocalKey({
+        password,
+      });
 
-    // encrypt and store the seed phrase backup
-    await this.#encryptAndStoreSeedPhraseBackup({
-      keyringId,
-      seedPhrase,
-      encKey,
-      authKeyPair,
-    });
+      // encrypt and store the seed phrase backup
+      await this.#encryptAndStoreSeedPhraseBackup({
+        keyringId,
+        seedPhrase,
+        encKey,
+        authKeyPair,
+      });
 
-    // store/persist the encryption key shares
-    // We store the seed phrase metadata in the metadata store first. If this operation fails,
-    // we avoid persisting the encryption key shares to prevent a situation where a user appears
-    // to have an account but with no associated data.
-    await this.#persistOprfKey(oprfKey, authKeyPair.pk);
-    // create a new vault with the resulting authentication data
-    await this.#createNewVaultWithAuthData({
-      password,
-      rawToprfEncryptionKey: encKey,
-      rawToprfAuthKeyPair: authKeyPair,
+      // store/persist the encryption key shares
+      // We store the seed phrase metadata in the metadata store first. If this operation fails,
+      // we avoid persisting the encryption key shares to prevent a situation where a user appears
+      // to have an account but with no associated data.
+      await this.#persistOprfKey(oprfKey, authKeyPair.pk);
+      // create a new vault with the resulting authentication data
+      await this.#createNewVaultWithAuthData({
+        password,
+        rawToprfEncryptionKey: encKey,
+        rawToprfAuthKeyPair: authKeyPair,
+      });
+      this.#persistAuthPubKey({
+        authPubKey: authKeyPair.pk,
+      });
     });
   }
 
@@ -273,16 +293,22 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     keyringId: string,
   ): Promise<void> {
     this.#assertIsUnlocked();
-    // verify the password and unlock the vault
-    const { toprfEncryptionKey, toprfAuthKeyPair } =
-      await this.#unlockVaultAndGetBackupEncKey();
+    await this.#assertPasswordInSync({
+      skipCache: true,
+    });
+    // NOTE don't include #assertPasswordInSync in #withControllerLock since #assertPasswordInSync already acquires the controller lock
+    return await this.#withControllerLock(async () => {
+      // verify the password and unlock the vault
+      const { toprfEncryptionKey, toprfAuthKeyPair } =
+        await this.#unlockVaultAndGetBackupEncKey();
 
-    // encrypt and store the seed phrase backup
-    await this.#encryptAndStoreSeedPhraseBackup({
-      keyringId,
-      seedPhrase,
-      encKey: toprfEncryptionKey,
-      authKeyPair: toprfAuthKeyPair,
+      // encrypt and store the seed phrase backup
+      await this.#encryptAndStoreSeedPhraseBackup({
+        keyringId,
+        seedPhrase,
+        encKey: toprfEncryptionKey,
+        authKeyPair: toprfAuthKeyPair,
+      });
     });
   }
 
@@ -298,33 +324,39 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     // assert that the user is authenticated before fetching the seed phrases
     this.#assertIsAuthenticatedUser(this.state);
 
-    const { encKey, authKeyPair } = await this.#recoverEncKey(password);
+    return await this.#withControllerLock(async () => {
+      const { encKey, authKeyPair } = await this.#recoverEncKey(password);
 
-    try {
-      const secretData = await this.toprfClient.fetchAllSecretDataItems({
-        decKey: encKey,
-        authKeyPair,
-      });
-
-      if (secretData?.length > 0) {
-        await this.#createNewVaultWithAuthData({
-          password,
-          rawToprfEncryptionKey: encKey,
-          rawToprfAuthKeyPair: authKeyPair,
+      try {
+        const secretData = await this.toprfClient.fetchAllSecretDataItems({
+          decKey: encKey,
+          authKeyPair,
         });
-      }
 
-      const secrets = SecretMetadata.parseSecretsFromMetadataStore(
-        secretData,
-        SecretType.Mnemonic,
-      );
-      return secrets.map((secret) => secret.data);
-    } catch (error) {
-      log('Error fetching seed phrase metadata', error);
-      throw new Error(
-        SeedlessOnboardingControllerError.FailedToFetchSeedPhraseMetadata,
-      );
-    }
+        if (secretData?.length > 0) {
+          await this.#createNewVaultWithAuthData({
+            password,
+            rawToprfEncryptionKey: encKey,
+            rawToprfAuthKeyPair: authKeyPair,
+          });
+
+          this.#persistAuthPubKey({
+            authPubKey: authKeyPair.pk,
+          });
+        }
+
+        const secrets = SecretMetadata.parseSecretsFromMetadataStore(
+          secretData,
+          SecretType.Mnemonic,
+        );
+        return secrets.map((secret) => secret.data);
+      } catch (error) {
+        log('Error fetching seed phrase metadata', error);
+        throw new Error(
+          SeedlessOnboardingControllerError.FailedToFetchSeedPhraseMetadata,
+        );
+      }
+    });
   }
 
   /**
@@ -334,27 +366,41 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
    *
    * @param newPassword - The new password to update.
    * @param oldPassword - The old password to verify.
+   * @returns A promise that resolves to the success of the operation.
    */
   async changePassword(newPassword: string, oldPassword: string) {
     this.#assertIsUnlocked();
     // verify the old password of the encrypted vault
-    await this.verifyPassword(oldPassword);
+    await this.verifyVaultPassword(oldPassword);
+    await this.#assertPasswordInSync({
+      skipCache: true,
+    });
 
-    try {
-      // update the encryption key with new password and update the Metadata Store
-      const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
-        await this.#changeEncryptionKey(newPassword, oldPassword);
+    // NOTE don't include verifyPassword and #assertPasswordInSync in #withControllerLock since verifyPassword and #assertPasswordInSync already acquires the controller lock
+    return await this.#withControllerLock(async () => {
+      try {
+        // update the encryption key with new password and update the Metadata Store
+        const { encKey: newEncKey, authKeyPair: newAuthKeyPair } =
+          await this.#changeEncryptionKey(newPassword, oldPassword);
 
-      // update and encrypt the vault with new password
-      await this.#createNewVaultWithAuthData({
-        password: newPassword,
-        rawToprfEncryptionKey: newEncKey,
-        rawToprfAuthKeyPair: newAuthKeyPair,
-      });
-    } catch (error) {
-      log('Error changing password', error);
-      throw new Error(SeedlessOnboardingControllerError.FailedToChangePassword);
-    }
+        // update and encrypt the vault with new password
+        await this.#createNewVaultWithAuthData({
+          password: newPassword,
+          rawToprfEncryptionKey: newEncKey,
+          rawToprfAuthKeyPair: newAuthKeyPair,
+        });
+
+        this.#persistAuthPubKey({
+          authPubKey: newAuthKeyPair.pk,
+        });
+        this.#resetPasswordOutdatedCache();
+      } catch (error) {
+        log('Error changing password', error);
+        throw new Error(
+          SeedlessOnboardingControllerError.FailedToChangePassword,
+        );
+      }
+    });
   }
 
   /**
@@ -384,14 +430,16 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
    * Verify the password validity by decrypting the vault.
    *
    * @param password - The password to verify.
+   * @returns A promise that resolves to the success of the operation.
    * @throws {Error} If the password is invalid or the vault is not initialized.
    */
-  async verifyPassword(password: string): Promise<void> {
-    if (!this.state.vault) {
-      throw new Error(SeedlessOnboardingControllerError.VaultError);
-    }
-
-    await this.#vaultEncryptor.decrypt(password, this.state.vault);
+  async verifyVaultPassword(password: string): Promise<void> {
+    return await this.#withControllerLock(async () => {
+      if (!this.state.vault) {
+        throw new Error(SeedlessOnboardingControllerError.VaultError);
+      }
+      await this.#vaultEncryptor.decrypt(password, this.state.vault);
+    });
   }
 
   /**
@@ -420,10 +468,13 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
    * This operation is useful when user performs some actions that requires the user password/encryption key. e.g. add new srp backup
    *
    * @param password - The password to submit.
+   * @returns A promise that resolves to the success of the operation.
    */
   async submitPassword(password: string): Promise<void> {
-    await this.#unlockVaultAndGetBackupEncKey(password);
-    this.#setUnlocked();
+    return await this.#withControllerLock(async () => {
+      await this.#unlockVaultAndGetBackupEncKey(password);
+      this.#setUnlocked();
+    });
   }
 
   /**
@@ -431,13 +482,158 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
    *
    * When the controller is locked, the user will not be able to perform any operations on the controller/vault.
    */
-  setLocked(): void {
+  setLocked() {
     this.update((state) => {
       delete state.vaultEncryptionKey;
       delete state.vaultEncryptionSalt;
     });
 
     this.#isUnlocked = false;
+  }
+
+  /**
+   * Sync the latest global password to the controller.
+   * reset vault with latest globalPassword,
+   * persist the latest global password authPubKey
+   *
+   * @param params - The parameters for syncing the latest global password.
+   * @param params.oldPassword - The old password to verify.
+   * @param params.globalPassword - The latest global password.
+   * @returns A promise that resolves to the success of the operation.
+   */
+  async syncLatestGlobalPassword({
+    oldPassword,
+    globalPassword,
+  }: {
+    oldPassword: string;
+    globalPassword: string;
+  }) {
+    // verify correct old password
+    await this.verifyVaultPassword(oldPassword);
+    // NOTE don't include verifyPassword in #withControllerLock since verifyPassword already acquires the controller lock
+    return await this.#withControllerLock(async () => {
+      // update vault with latest globalPassword
+      const { encKey, authKeyPair } = await this.#recoverEncKey(globalPassword);
+      // update and encrypt the vault with new password
+      await this.#createNewVaultWithAuthData({
+        password: globalPassword,
+        rawToprfEncryptionKey: encKey,
+        rawToprfAuthKeyPair: authKeyPair,
+      });
+      // persist the latest global password authPubKey
+      this.#persistAuthPubKey({
+        authPubKey: authKeyPair.pk,
+      });
+      this.#resetPasswordOutdatedCache();
+    });
+  }
+
+  /**
+   * @description Fetch the password corresponding to the current authPubKey in state (current device password which is already out of sync with the current global password).
+   * then we use this recovered old password to unlock the vault and set the password to the new global password.
+   *
+   * @param params - The parameters for fetching the password.
+   * @param params.globalPassword - The latest global password.
+   * @returns A promise that resolves to the password corresponding to the current authPubKey in state.
+   */
+  async recoverCurrentDevicePassword({
+    globalPassword,
+  }: {
+    globalPassword: string;
+  }): Promise<{ password: string }> {
+    return await this.#withControllerLock(async () => {
+      const currentDeviceAuthPubKey = this.#recoverAuthPubKey();
+      const { password: currentDevicePassword } = await this.#recoverPassword({
+        targetPwPubKey: currentDeviceAuthPubKey,
+        globalPassword,
+      });
+      return {
+        password: currentDevicePassword,
+      };
+    });
+  }
+
+  /**
+   * @description Fetch the password corresponding to the targetPwPubKey.
+   *
+   * @param params - The parameters for fetching the password.
+   * @param params.targetPwPubKey - The target public key of the password to recover.
+   * @param params.globalPassword - The latest global password.
+   * @returns A promise that resolves to the password corresponding to the current authPubKey in state.
+   */
+  async #recoverPassword({
+    targetPwPubKey,
+    globalPassword,
+  }: {
+    targetPwPubKey: SEC1EncodedPublicKey;
+    globalPassword: string;
+  }): Promise<{ password: string }> {
+    const { encKey: latestPwEncKey, authKeyPair: latestPwAuthKeyPair } =
+      await this.#recoverEncKey(globalPassword);
+
+    try {
+      const res = await this.toprfClient.recoverPassword({
+        targetPwPubKey,
+        curEncKey: latestPwEncKey,
+        curAuthKeyPair: latestPwAuthKeyPair,
+      });
+      return res;
+    } catch (error) {
+      throw PasswordSyncError.getInstance(error);
+    }
+  }
+
+  /**
+   * @description Check if the current password is outdated compare to the global password.
+   *
+   * @param options - Optional options object.
+   * @param options.skipCache - If true, bypass the cache and force a fresh check.
+   * @returns A promise that resolves to true if the password is outdated, false otherwise.
+   */
+  async checkIsPasswordOutdated(options?: {
+    skipCache?: boolean;
+  }): Promise<boolean> {
+    // cache result to reduce load on infra
+    // Check cache first unless skipCache is true
+    if (!options?.skipCache) {
+      const { passwordOutdatedCache } = this.state;
+      const now = Date.now();
+      const isCacheValid =
+        passwordOutdatedCache &&
+        now - passwordOutdatedCache.timestamp < PASSWORD_OUTDATED_CACHE_TTL_MS;
+
+      if (isCacheValid) {
+        return passwordOutdatedCache.isExpiredPwd;
+      }
+    }
+    return await this.#withControllerLock(async () => {
+      this.#assertIsAuthenticatedUser(this.state);
+      const {
+        nodeAuthTokens,
+        authConnectionId,
+        groupedAuthConnectionId,
+        userId,
+      } = this.state;
+
+      const currentDeviceAuthPubKey = this.#recoverAuthPubKey();
+
+      const { authPubKey: globalAuthPubKey } =
+        await this.toprfClient.fetchAuthPubKey({
+          nodeAuthTokens,
+          authConnectionId: groupedAuthConnectionId || authConnectionId,
+          userId,
+        });
+
+      // use noble lib to deserialize and compare curve point
+      const isExpiredPwd = !secp256k1.ProjectivePoint.fromHex(
+        currentDeviceAuthPubKey,
+      ).equals(secp256k1.ProjectivePoint.fromHex(globalAuthPubKey));
+      // Cache the result in state
+      this.update((state) => {
+        state.passwordOutdatedCache = { isExpiredPwd, timestamp: Date.now() };
+      });
+      return isExpiredPwd;
+    });
   }
 
   #setUnlocked(): void {
@@ -478,6 +674,32 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
       log('Error persisting local encryption key', error);
       throw new Error(SeedlessOnboardingControllerError.FailedToPersistOprfKey);
     }
+  }
+
+  /**
+   * Persist the authentication public key for the seedless onboarding flow.
+   * convert to suitable format before persisting.
+   *
+   * @param params - The parameters for persisting the authentication public key.
+   * @param params.authPubKey - The authentication public key to be persisted.
+   */
+  #persistAuthPubKey(params: { authPubKey: SEC1EncodedPublicKey }): void {
+    this.update((state) => {
+      state.authPubKey = bytesToBase64(params.authPubKey);
+    });
+  }
+
+  /**
+   * Recover the authentication public key from the state.
+   * convert to pubkey format before recovering.
+   *
+   * @returns The authentication public key.
+   */
+  #recoverAuthPubKey(): SEC1EncodedPublicKey {
+    this.#assertIsSRPBackedUpUser(this.state);
+    const { authPubKey } = this.state;
+
+    return base64ToBytes(authPubKey);
   }
 
   /**
@@ -827,6 +1049,24 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
   }
 
   /**
+   * Lock the controller mutex before executing the given function,
+   * and release it after the function is resolved or after an
+   * error is thrown.
+   *
+   * This wrapper ensures that each mutable operation that interacts with the
+   * controller and that changes its state is executed in a mutually exclusive way,
+   * preventing unsafe concurrent access that could lead to unpredictable behavior.
+   *
+   * @param callback - The function to execute while the controller mutex is locked.
+   * @returns The result of the function.
+   */
+  async #withControllerLock<Result>(
+    callback: MutuallyExclusiveCallback<Result>,
+  ): Promise<Result> {
+    return await withLock(this.#controllerOperationMutex, callback);
+  }
+
+  /**
    * Lock the vault mutex before executing the given function,
    * and release it after the function is resolved or after an
    * error is thrown.
@@ -950,6 +1190,36 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     ) {
       throw new Error(SeedlessOnboardingControllerError.InsufficientAuthToken);
     }
+  }
+
+  #assertIsSRPBackedUpUser(
+    value: unknown,
+  ): asserts value is SRPBackedUpUserDetails {
+    if (!this.state.authPubKey) {
+      throw new Error(SeedlessOnboardingControllerError.SRPNotBackedUpError);
+    }
+  }
+
+  /**
+   * Assert that the password is in sync with the global password.
+   *
+   * @param options - The options for asserting the password is in sync.
+   * @param options.skipCache - Whether to skip the cache check.
+   * @throws If the password is outdated.
+   */
+  async #assertPasswordInSync(options?: {
+    skipCache?: boolean;
+  }): Promise<void> {
+    const isPasswordOutdated = await this.checkIsPasswordOutdated(options);
+    if (isPasswordOutdated) {
+      throw new Error(SeedlessOnboardingControllerError.OutdatedPassword);
+    }
+  }
+
+  #resetPasswordOutdatedCache(): void {
+    this.update((state) => {
+      delete state.passwordOutdatedCache;
+    });
   }
 
   /**
