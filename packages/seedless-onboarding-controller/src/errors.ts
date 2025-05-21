@@ -5,7 +5,6 @@ import {
 } from '@metamask/toprf-secure-backup';
 
 import { SeedlessOnboardingControllerError } from './constants';
-import type { ToprfRecoveryDetails } from './types';
 
 /**
  * Get the error message from the TOPRF error code.
@@ -109,21 +108,6 @@ export class RecoveryError extends Error {
     }
     return new RecoveryError(
       SeedlessOnboardingControllerError.LoginFailedError,
-    );
-  }
-
-  /**
-   * Get an instance of the RecoveryError class for too many login attempts.
-   *
-   * @param errorData - The error data to get the instance of.
-   * @returns The instance of the RecoveryError class.
-   */
-  static getTooManyLoginAttemptsError(
-    errorData: RateLimitErrorData,
-  ): RecoveryError {
-    return new RecoveryError(
-      SeedlessOnboardingControllerError.TooManyLoginAttempts,
-      errorData,
     );
   }
 

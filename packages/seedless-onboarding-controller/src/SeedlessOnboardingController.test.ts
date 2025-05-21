@@ -1654,6 +1654,41 @@ describe('SeedlessOnboardingController', () => {
       );
     });
 
+    it('should throw `TooManyLoginAttempts` error after 3 failed attempts', async () => {
+      await withController(
+        {
+          state: {
+            ...getMockInitialControllerState({
+              withMockAuthenticatedUser: true,
+            }),
+            toprfRecoveryDetails: {
+              numberOfAttempts: 2,
+              remainingTime: 0,
+            },
+          },
+        },
+        async ({ controller, toprfClient }) => {
+          jest
+            .spyOn(toprfClient, 'recoverEncKey')
+            .mockRejectedValueOnce(
+              new TOPRFError(1006, 'Could not derive encryption key'),
+            );
+
+          await expect(
+            controller.fetchAllSeedPhrases(MOCK_PASSWORD),
+          ).rejects.toStrictEqual(
+            new RecoveryError(
+              SeedlessOnboardingControllerError.TooManyLoginAttempts,
+              {
+                remainingTime: 15,
+                message: 'Too many login attempts',
+              },
+            ),
+          );
+        },
+      );
+    });
+
     it('should handle TooManyLoginAttempts error', async () => {
       await withController(
         {
