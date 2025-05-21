@@ -50,6 +50,10 @@ const log = createModuleLogger(projectLogger, controllerName);
 export function getDefaultSeedlessOnboardingControllerState(): SeedlessOnboardingControllerState {
   return {
     socialBackupsMetadata: [],
+    toprfRecoveryDetails: {
+      numberOfAttempts: 0,
+      remainingTime: 0,
+    },
   };
 }
 
@@ -107,6 +111,10 @@ const seedlessOnboardingMetadata: StateMetadata<SeedlessOnboardingControllerStat
       anonymous: true,
     },
     passwordOutdatedCache: {
+      persist: true,
+      anonymous: true,
+    },
+    toprfRecoveryDetails: {
       persist: true,
       anonymous: true,
     },
@@ -718,6 +726,10 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
     const authConnectionId =
       this.state.groupedAuthConnectionId || this.state.authConnectionId;
 
+    const { numberOfAttempts } = this.state.toprfRecoveryDetails;
+    // Update the number of recovery attempts
+    const updatedNumberOfAttempts = numberOfAttempts + 1;
+
     try {
       const recoverEncKeyResult = await this.toprfClient.recoverEncKey({
         nodeAuthTokens: this.state.nodeAuthTokens,
@@ -725,9 +737,27 @@ export class SeedlessOnboardingController<EncryptionKey> extends BaseController<
         authConnectionId,
         userId: this.state.userId,
       });
+
+      // Reset the number of recovery attempts if successful
+      this.update((state) => {
+        state.toprfRecoveryDetails.numberOfAttempts = 0;
+        state.toprfRecoveryDetails.remainingTime = 0;
+      });
+
       return recoverEncKeyResult;
     } catch (error) {
-      throw RecoveryError.getInstance(error);
+      const recoveryError = RecoveryError.getInstance(
+        error,
+        updatedNumberOfAttempts,
+      );
+
+      this.update((state) => {
+        state.toprfRecoveryDetails.remainingTime =
+          recoveryError.data?.remainingTime || 0;
+        state.toprfRecoveryDetails.numberOfAttempts = updatedNumberOfAttempts;
+      });
+
+      throw recoveryError;
     }
   }
 

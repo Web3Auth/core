@@ -5,6 +5,7 @@ import {
 } from '@metamask/toprf-secure-backup';
 
 import { SeedlessOnboardingControllerError } from './constants';
+import type { ToprfRecoveryDetails } from './types';
 
 /**
  * Get the error message from the TOPRF error code.
@@ -63,6 +64,10 @@ export class PasswordSyncError extends Error {
  * It extends the Error class and includes a data property that can be used to store additional information.
  */
 export class RecoveryError extends Error {
+  // initial delay period after the third failed attempt.
+  // TODO: Ideally we should get this from the TOPRF server, but for now we are using a default hard-coded value.
+  public static readonly INITIAL_RECOVERY_DELAY_TIME = 15; // 15 Seconds
+
   data: RateLimitErrorData | undefined;
 
   constructor(message: string, data?: RateLimitErrorData) {
@@ -75,19 +80,50 @@ export class RecoveryError extends Error {
    * Get an instance of the RecoveryError class.
    *
    * @param error - The error to get the instance of.
+   * @param numberOfRecoveryAttempts - The number of recovery attempts.
+   * After the third attempt, this method will return TooManyLoginAttempts error and block the user for 15 seconds delay period before allowing them to try again.
    * @returns The instance of the RecoveryError class.
    */
-  static getInstance(error: unknown): RecoveryError {
+  static getInstance(
+    error: unknown,
+    numberOfRecoveryAttempts?: number,
+  ): RecoveryError {
     if (error instanceof TOPRFError) {
-      const rateLimitErrorData = RecoveryError.getRateLimitErrorData(error);
-      const errorMessage = getErrorMessageFromTOPRFErrorCode(
+      let rateLimitErrorData = RecoveryError.getRateLimitErrorData(error);
+      let errorMessage = getErrorMessageFromTOPRFErrorCode(
         error.code,
         SeedlessOnboardingControllerError.LoginFailedError,
       );
+
+      // After the third attempt, set the error message to the too many login attempts error message
+      // and set the rate limit error data to the remaining time and message.
+      // This will block the user for 15 seconds delay period before allowing them to try again.
+      if (numberOfRecoveryAttempts === 3) {
+        rateLimitErrorData = {
+          remainingTime: RecoveryError.INITIAL_RECOVERY_DELAY_TIME,
+          message: 'Too many login attempts',
+        };
+        errorMessage = SeedlessOnboardingControllerError.TooManyLoginAttempts;
+      }
       return new RecoveryError(errorMessage, rateLimitErrorData);
     }
     return new RecoveryError(
       SeedlessOnboardingControllerError.LoginFailedError,
+    );
+  }
+
+  /**
+   * Get an instance of the RecoveryError class for too many login attempts.
+   *
+   * @param errorData - The error data to get the instance of.
+   * @returns The instance of the RecoveryError class.
+   */
+  static getTooManyLoginAttemptsError(
+    errorData: RateLimitErrorData,
+  ): RecoveryError {
+    return new RecoveryError(
+      SeedlessOnboardingControllerError.TooManyLoginAttempts,
+      errorData,
     );
   }
 

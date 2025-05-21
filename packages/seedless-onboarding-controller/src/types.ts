@@ -65,6 +65,21 @@ export type SRPBackedUpUserDetails = {
   authPubKey: string;
 };
 
+/**
+ * TOPRF Recovery attempt details.
+ */
+export type ToprfRecoveryDetails = {
+  /**
+   * The number of attempts made to recover the password.
+   */
+  numberOfAttempts: number;
+
+  /**
+   * The remaining time in seconds to wait before the next attempt to recover the password.
+   */
+  remainingTime: number;
+};
+
 // State
 export type SeedlessOnboardingControllerState =
   Partial<AuthenticatedUserDetails> &
@@ -96,6 +111,11 @@ export type SeedlessOnboardingControllerState =
        * Cache for checkIsPasswordOutdated result and timestamp.
        */
       passwordOutdatedCache?: { isExpiredPwd: boolean; timestamp: number };
+
+      /**
+       * Details about the TOPRF recovery process.
+       */
+      toprfRecoveryDetails: ToprfRecoveryDetails;
     };
 
 // Actions
