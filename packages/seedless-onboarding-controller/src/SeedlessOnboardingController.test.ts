@@ -3466,6 +3466,7 @@ describe('SeedlessOnboardingController', () => {
 
             expect(toprfClient.authenticate).toHaveBeenCalledWith({
               authConnectionId:
+                // eslint-disable-next-line jest/no-conditional-in-test
                 controller.state.groupedAuthConnectionId ||
                 controller.state.authConnectionId,
               userId: controller.state.userId,
