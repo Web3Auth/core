@@ -62,7 +62,7 @@
     "@metamask/utils": "^11.2.0",
     "bignumber.js": "^9.1.2",
     "reselect": "^5.1.1",
-    "uuid": "^8.3.2"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@metamask/accounts-controller": "^30.0.0",
@@ -78,7 +78,7 @@
     "deepmerge": "^4.2.2",
     "jest": "^27.5.1",
     "jest-environment-jsdom": "^27.5.1",
-    "lodash": "^4.17.21",
+    "lodash": "^4.18.1",
     "nock": "^13.3.1",
     "ts-jest": "^27.1.4",
     "typedoc": "^0.24.8",
