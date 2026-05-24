@@ -73,7 +73,7 @@
     "lodash": "^4.17.21",
     "multiformats": "^13.1.0",
     "single-call-balance-checker-abi": "^1.0.0",
-    "uuid": "^8.3.2"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@babel/runtime": "^7.23.9",
